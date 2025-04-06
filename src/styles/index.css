@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Reset some basic styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Set body background and font styles */
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Arial', sans-serif;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  #root {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Basic container for centering content */
+ /* .container {
+    width: 80%;
+    margin: 0 auto;
+    max-width: 1200px;
+  }*/
+  
+  /* Styling the links */
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+  
+  /* Add some padding and styling for the header */
+  header {
+    background-color: #333;
+    color: white;
+    padding: 20px 0;
+  }
+  
+  header .logo {
+    font-size: 2rem;
+    font-weight: bold;
+  }
+  
+  header .navbar a {
+    margin: 0 15px;
+    color: white;
+    font-size: 1.2rem;
+  }
+  
+  header .navbar a:hover {
+    color: #ff6347;
+  }
+  
+  /* Hero section styles */
+  .hero-section {
+    background-color: #3498db;
+    color: white;
+    text-align: center;
+    padding: 50px 0;
+  }
+  
+  .hero-section h1 {
+    font-size: 3rem;
+  }
+  
+  .hero-section p {
+    font-size: 1.2rem;
+  }
+  
+  /* Button styles */
+  .btn-primary {
+    background-color: #ff6347;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-transform: uppercase;
+  }
+  
+  .btn-primary:hover {
+    background-color: #e5533c;
+  }
+  

@@ -1,0 +1,104 @@
+package com.hsa.controller;
+
+import com.hsa.dto.DoctorResponse;
+import com.hsa.dto.CreateDoctorRequest;
+import com.hsa.dto.UpdateDoctorRequest;
+import com.hsa.dto.UpdateDoctorStatusRequest;
+import com.hsa.model.Doctor;
+import com.hsa.service.AdminService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import java.io.IOException;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api/admin")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
+@PreAuthorize("hasRole('ADMIN')")
+public class AdminController {
+
+    private final AdminService adminService;
+
+    @GetMapping("/doctors")
+    public ResponseEntity<List<DoctorResponse>> getAllDoctors() {
+        List<Doctor> doctors = adminService.getAllDoctors();
+        List<DoctorResponse> response = doctors.stream()
+                .map(this::mapToDoctorResponse)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/doctors/{id}")
+    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable Long id) {
+        Doctor doctor = adminService.getDoctorById(id);
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @PostMapping("/doctors")
+    public ResponseEntity<DoctorResponse> createDoctor(@RequestBody CreateDoctorRequest request) {
+        Doctor doctor = adminService.createDoctor(request);
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @PutMapping("/doctors/{id}")
+    public ResponseEntity<DoctorResponse> updateDoctor(
+            @PathVariable Long id,
+            @RequestBody UpdateDoctorRequest request) {
+        Doctor doctor = adminService.updateDoctor(id, request);
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @PutMapping("/doctors/{id}/status")
+    public ResponseEntity<DoctorResponse> updateDoctorStatus(
+            @PathVariable Long id,
+            @RequestBody UpdateDoctorStatusRequest request) {
+        Doctor doctor = adminService.updateDoctorStatus(id, request.getStatus());
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @PostMapping(value = "/doctors/{id}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DoctorResponse> uploadProfilePicture(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        Doctor doctor = adminService.uploadProfilePicture(id, file);
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @PostMapping(value = "/doctors/{id}/credentials", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DoctorResponse> uploadCredentials(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        Doctor doctor = adminService.uploadCredentials(id, file);
+        return ResponseEntity.ok(mapToDoctorResponse(doctor));
+    }
+
+    @DeleteMapping("/doctors/{id}")
+    public ResponseEntity<Void> deleteDoctor(@PathVariable Long id) {
+        adminService.deleteDoctor(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    private DoctorResponse mapToDoctorResponse(Doctor doctor) {
+        return new DoctorResponse(
+                doctor.getId(),
+                doctor.getName(),
+                doctor.getEmail(),
+                doctor.getSpecialization(),
+                doctor.getQualification(),
+                doctor.getExperience(),
+                doctor.getClinicAddress(),
+                doctor.getStatus(),
+                doctor.getProfilePicture(),
+                doctor.getCredentialsFile(),
+                doctor.getConsultationFee(),
+                doctor.getAvailabilitySchedule()
+        );
+    }
+} 
