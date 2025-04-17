@@ -25,6 +25,12 @@ public class Patient extends User {
 
     @Column
     private String gender;
+    
+    @Column
+    private String profilePicture;
+    
+    @Column
+    private String medicalRecords;
 
     public Patient(String name, String email, String password, String phoneNumber,
                   String address, String bloodGroup, Integer age, String gender) {

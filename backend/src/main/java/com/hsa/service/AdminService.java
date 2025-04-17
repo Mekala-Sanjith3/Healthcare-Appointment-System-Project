@@ -1,9 +1,13 @@
 package com.hsa.service;
 
 import com.hsa.dto.CreateDoctorRequest;
+import com.hsa.dto.CreatePatientRequest;
 import com.hsa.dto.UpdateDoctorRequest;
+import com.hsa.dto.UpdatePatientRequest;
 import com.hsa.model.Doctor;
+import com.hsa.model.Patient;
 import com.hsa.repository.DoctorRepository;
+import com.hsa.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import java.util.UUID;
 public class AdminService {
 
     private final DoctorRepository doctorRepository;
+    private final PatientRepository patientRepository;
     private final PasswordEncoder passwordEncoder;
     private final String uploadDir = "uploads";
 
@@ -105,6 +110,81 @@ public class AdminService {
         String fileName = saveFile(file, "credentials");
         doctor.setCredentialsFile(fileName);
         return doctorRepository.save(doctor);
+    }
+
+    // Patient Management Methods
+    public List<Patient> getAllPatients() {
+        return patientRepository.findAll();
+    }
+
+    public Patient getPatientById(Long id) {
+        return patientRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Patient not found with id: " + id));
+    }
+
+    public Patient createPatient(CreatePatientRequest request) {
+        // Check if email is already in use
+        if (patientRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email is already in use");
+        }
+
+        // Create new patient
+        Patient patient = new Patient(
+            request.getName(),
+            request.getEmail(),
+            passwordEncoder.encode(request.getPassword()),
+            request.getPhoneNumber(),
+            request.getAddress(),
+            request.getBloodGroup(),
+            request.getAge(),
+            request.getGender()
+        );
+
+        return patientRepository.save(patient);
+    }
+
+    public Patient updatePatient(Long id, UpdatePatientRequest request) {
+        Patient patient = getPatientById(id);
+
+        // Check if email is already in use by another patient
+        patientRepository.findByEmail(request.getEmail())
+                .ifPresent(existingPatient -> {
+                    if (!existingPatient.getId().equals(id)) {
+                        throw new IllegalArgumentException("Email is already in use by another patient");
+                    }
+                });
+
+        // Update patient details
+        patient.setName(request.getName());
+        patient.setEmail(request.getEmail());
+        patient.setPhoneNumber(request.getPhoneNumber());
+        patient.setAddress(request.getAddress());
+        patient.setBloodGroup(request.getBloodGroup());
+        patient.setAge(request.getAge());
+        patient.setGender(request.getGender());
+
+        return patientRepository.save(patient);
+    }
+
+    public void deletePatient(Long id) {
+        if (!patientRepository.existsById(id)) {
+            throw new IllegalArgumentException("Patient not found with id: " + id);
+        }
+        patientRepository.deleteById(id);
+    }
+
+    public Patient uploadPatientProfilePicture(Long id, MultipartFile file) throws IOException {
+        Patient patient = getPatientById(id);
+        String fileName = saveFile(file, "patient-profile-pictures");
+        patient.setProfilePicture(fileName);
+        return patientRepository.save(patient);
+    }
+
+    public Patient uploadMedicalRecords(Long id, MultipartFile file) throws IOException {
+        Patient patient = getPatientById(id);
+        String fileName = saveFile(file, "medical-records");
+        patient.setMedicalRecords(fileName);
+        return patientRepository.save(patient);
     }
 
     private String saveFile(MultipartFile file, String subDirectory) throws IOException {

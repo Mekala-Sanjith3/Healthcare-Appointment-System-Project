@@ -1,18 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DoctorsList from './DoctorsList';
+import PatientsList from './PatientsList';
+import AppointmentsList from './AppointmentsList';
+import AnalyticsDashboard from './AnalyticsDashboard';
 import AddDoctorModal from './AddDoctorModal';
+import AddPatientModal from './AddPatientModal';
+import AddAppointmentModal from './AddAppointmentModal';
+import ChartConfigurator from './ChartConfigurator';
 import "../../../styles/pages/admin/AdminDashboard.css";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('doctors');
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
+  const [doctorFilters, setDoctorFilters] = useState({
     specialization: '',
     status: 'all'
   });
+  const [patientFilters, setPatientFilters] = useState({
+    bloodGroup: '',
+    gender: ''
+  });
+  const [appointmentFilters, setAppointmentFilters] = useState({
+    status: 'all',
+    date: ''
+  });
+  const [appointments, setAppointments] = useState([]);
 
   const handleLogout = () => {
     // Clear local storage
@@ -25,15 +42,39 @@ const AdminDashboard = () => {
     setSearchTerm(e.target.value);
   };
 
-  const handleFilterChange = (e) => {
-    setFilters({
-      ...filters,
+  const handleDoctorFilterChange = (e) => {
+    setDoctorFilters({
+      ...doctorFilters,
       [e.target.name]: e.target.value
     });
   };
 
+  const handlePatientFilterChange = (e) => {
+    setPatientFilters({
+      ...patientFilters,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleAppointmentFilterChange = (e) => {
+    setAppointmentFilters({
+      ...appointmentFilters,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  // Function to handle adding a new appointment
+  const handleAddAppointment = (newAppointment) => {
+    setAppointments([newAppointment, ...appointments]);
+    setShowAddAppointmentModal(false);
+    // In a real application, this would make an API call to save the appointment
+  };
+
   return (
     <div className="dashboard-container">
+      {/* Initialize Chart.js globally */}
+      <ChartConfigurator />
+      
       <aside className="dashboard-sidebar">
         <div className="sidebar-header">
           <i className="fas fa-hospital-user"></i>
@@ -102,6 +143,24 @@ const AdminDashboard = () => {
                 Add New Doctor
               </button>
             )}
+            {activeTab === 'patients' && (
+              <button 
+                className="add-button"
+                onClick={() => setShowAddPatientModal(true)}
+              >
+                <i className="fas fa-plus"></i>
+                Add New Patient
+              </button>
+            )}
+            {activeTab === 'appointments' && (
+              <button 
+                className="add-button"
+                onClick={() => setShowAddAppointmentModal(true)}
+              >
+                <i className="fas fa-plus"></i>
+                Add New Appointment
+              </button>
+            )}
           </div>
         </header>
 
@@ -121,8 +180,8 @@ const AdminDashboard = () => {
                 <div className="filters">
                   <select 
                     name="specialization"
-                    value={filters.specialization}
-                    onChange={handleFilterChange}
+                    value={doctorFilters.specialization}
+                    onChange={handleDoctorFilterChange}
                   >
                     <option value="">All Specializations</option>
                     <option value="Cardiology">Cardiology</option>
@@ -134,8 +193,8 @@ const AdminDashboard = () => {
                   </select>
                   <select 
                     name="status"
-                    value={filters.status}
-                    onChange={handleFilterChange}
+                    value={doctorFilters.status}
+                    onChange={handleDoctorFilterChange}
                   >
                     <option value="all">All Status</option>
                     <option value="ACTIVE">Active</option>
@@ -147,27 +206,101 @@ const AdminDashboard = () => {
 
               <DoctorsList 
                 searchTerm={searchTerm}
-                filters={filters}
+                filters={doctorFilters}
               />
             </div>
           )}
 
           {activeTab === 'patients' && (
             <div className="patients-management">
-              <p>Patient management coming soon...</p>
+              <div className="search-filters">
+                <div className="search-box">
+                  <i className="fas fa-search"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search patients by name, email, phone..."
+                    value={searchTerm}
+                    onChange={handleSearch}
+                  />
+                </div>
+                <div className="filters">
+                  <select 
+                    name="bloodGroup"
+                    value={patientFilters.bloodGroup}
+                    onChange={handlePatientFilterChange}
+                  >
+                    <option value="">All Blood Groups</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                  <select 
+                    name="gender"
+                    value={patientFilters.gender}
+                    onChange={handlePatientFilterChange}
+                  >
+                    <option value="">All Genders</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <PatientsList 
+                searchTerm={searchTerm}
+                filters={patientFilters}
+              />
             </div>
           )}
 
           {activeTab === 'appointments' && (
             <div className="appointments-management">
-              <p>Appointment management coming soon...</p>
+              <div className="search-filters">
+                <div className="search-box">
+                  <i className="fas fa-search"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search appointments by patient name, doctor name..."
+                    value={searchTerm}
+                    onChange={handleSearch}
+                  />
+                </div>
+                <div className="filters">
+                  <select 
+                    name="status"
+                    value={appointmentFilters.status}
+                    onChange={handleAppointmentFilterChange}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                  <input 
+                    type="date"
+                    name="date"
+                    value={appointmentFilters.date}
+                    onChange={handleAppointmentFilterChange}
+                    className="date-filter"
+                  />
+                </div>
+              </div>
+
+              <AppointmentsList
+                searchTerm={searchTerm}
+                filters={appointmentFilters}
+              />
             </div>
           )}
 
           {activeTab === 'analytics' && (
-            <div className="analytics-dashboard">
-              <p>Analytics dashboard coming soon...</p>
-            </div>
+            <AnalyticsDashboard />
           )}
         </div>
 
@@ -178,6 +311,21 @@ const AdminDashboard = () => {
             // Refresh the doctors list
             window.location.reload();
           }}
+        />
+
+        <AddPatientModal 
+          isOpen={showAddPatientModal}
+          onClose={() => setShowAddPatientModal(false)}
+          onAdd={() => {
+            // Refresh the patients list
+            window.location.reload();
+          }}
+        />
+
+        <AddAppointmentModal 
+          isOpen={showAddAppointmentModal}
+          onClose={() => setShowAddAppointmentModal(false)}
+          onAdd={handleAddAppointment}
         />
       </main>
     </div>
