@@ -9,7 +9,7 @@
 }
 
 .stats-header h2 {
-  color: #343a40;
+  color: #2c3e50;
   font-size: 24px;
   margin-bottom: 5px;
 }
@@ -57,7 +57,7 @@
 
 .stat-card.doctors .stat-icon-wrapper {
   background-color: #e3f2fd;
-  color: #0d6efd;
+  color: #3498db;
 }
 
 .stat-card.patients .stat-icon-wrapper {
@@ -97,15 +97,15 @@
 }
 
 .stat-bar.active {
-  background-color: #28a745;
+  background-color: #2ecc71;
 }
 
 .stat-bar.pending {
-  background-color: #ffc107;
+  background-color: #f6c23e;
 }
 
 .stat-bar.inactive {
-  background-color: #dc3545;
+  background-color: #e74c3c;
 }
 
 .stat-legend {
@@ -129,15 +129,15 @@
 }
 
 .color-box.active {
-  background-color: #28a745;
+  background-color: #2ecc71;
 }
 
 .color-box.pending {
-  background-color: #ffc107;
+  background-color: #f6c23e;
 }
 
 .color-box.inactive {
-  background-color: #dc3545;
+  background-color: #e74c3c;
 }
 
 .stat-gender {
@@ -217,13 +217,13 @@
 
 .insight-header i {
   font-size: 20px;
-  color: #ffc107;
+  color: #3498db;
   margin-right: 10px;
 }
 
 .insight-header h3 {
   font-size: 18px;
-  color: #343a40;
+  color: #2c3e50;
   margin: 0;
 }
 

@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "../../common/Button/button";
-import { Input } from "../../common/Input/input";
 import { authApi } from "../../../services/api";
 import "../../../styles/pages/admin/AdminLogin.css";
 
@@ -15,16 +13,30 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setCredentials(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear error when user starts typing
+    if (error) setError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
     
     try {
+      console.log("Attempting login with credentials:", { ...credentials, role: "ADMIN" });
       const response = await authApi.login({
         ...credentials,
         role: "ADMIN"
       });
+      
+      console.log("Login successful:", response);
       
       // Store token and user data
       localStorage.setItem('token', response.token);
@@ -37,6 +49,7 @@ const AdminLogin = () => {
       
       navigate('/admin');
     } catch (err) {
+      console.error("Login error:", err);
       setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -91,10 +104,9 @@ const AdminLogin = () => {
                 <input
                   type="email"
                   id="email"
+                  name="email"
                   value={credentials.email}
-                  onChange={(e) =>
-                    setCredentials({ ...credentials, email: e.target.value })
-                  }
+                  onChange={handleChange}
                   required
                   placeholder="Enter your email"
                 />
@@ -109,10 +121,9 @@ const AdminLogin = () => {
                   <input
                     type={showPassword ? "text" : "password"}
                     id="password"
+                    name="password"
                     value={credentials.password}
-                    onChange={(e) =>
-                      setCredentials({ ...credentials, password: e.target.value })
-                    }
+                    onChange={handleChange}
                     required
                     placeholder="Enter your password"
                   />

@@ -29,6 +29,44 @@
   font-weight: 600;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.print-all-btn {
+  background-color: #36b9cc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.print-all-btn:hover {
+  background-color: #2a8d9d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(54, 185, 204, 0.2);
+}
+
+.print-all-btn:disabled {
+  background-color: #c4c4c4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.print-all-btn i {
+  font-size: 0.85rem;
+}
+
 .add-record-btn {
   background-color: #4e73df;
   color: white;
@@ -419,19 +457,125 @@ form {
   .records-sidebar {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid #e9ecef;
     padding-right: 0;
+    border-bottom: 1px solid #e9ecef;
     padding-bottom: 15px;
+    margin-bottom: 15px;
     max-height: 300px;
   }
   
   .record-details {
     padding-left: 0;
-    padding-top: 15px;
   }
   
   .form-row {
     flex-direction: column;
-    gap: 0;
+  }
+  
+  .form-group {
+    width: 100%;
+  }
+  
+  .records-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .print-all-btn, .add-record-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .record-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  
+  .record-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+  
+  .print-all-btn, .add-record-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .action-btn {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Print specific styles */
+@media print {
+  .medical-records-view {
+    padding: 0;
+    box-shadow: none;
+  }
+  
+  .records-header, 
+  .records-sidebar, 
+  .no-record-selected, 
+  .record-actions, 
+  .add-record-modal {
+    display: none !important;
+  }
+  
+  .records-container {
+    display: block;
+  }
+  
+  .record-details {
+    padding-left: 0;
+    width: 100%;
+  }
+  
+  .record-content {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  .record-info {
+    background-color: transparent;
+    border: 1px solid #ddd;
+  }
+  
+  .info-label {
+    color: #000;
+  }
+  
+  .info-value, 
+  .record-description p, 
+  .record-prescriptions p {
+    color: #333;
+  }
+  
+  .record-header h3 {
+    font-size: 18pt;
+    margin-bottom: 15pt;
+    color: #000;
+  }
+  
+  .record-description h4, 
+  .record-prescriptions h4 {
+    font-size: 14pt;
+    color: #000;
+    margin-top: 15pt;
   }
 } 

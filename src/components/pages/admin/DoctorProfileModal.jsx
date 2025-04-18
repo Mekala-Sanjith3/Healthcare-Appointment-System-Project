@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminApi } from '../../../services/api';
 import '../../../styles/pages/admin/DoctorProfileModal.css';
 
 const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
@@ -28,17 +29,7 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
 
   const fetchDoctorDetails = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/doctors/${doctorId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch doctor details');
-      }
-
-      const data = await response.json();
+      const data = await adminApi.getDoctorById(doctorId);
       setDoctor(data);
       setFormData({
         name: data.name,
@@ -47,12 +38,14 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
         qualification: data.qualification,
         experience: data.experience,
         clinicAddress: data.clinicAddress,
-        status: data.status,
+        status: data.status || 'ACTIVE',
         consultationFee: data.consultationFee || '',
         availabilitySchedule: data.availabilitySchedule || ''
       });
+      setError(null);
     } catch (err) {
-      setError(err.message);
+      console.error("Error fetching doctor details:", err);
+      setError(err.message || 'Failed to fetch doctor details');
     } finally {
       setLoading(false);
     }
@@ -70,29 +63,13 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
     if (!file) return;
 
     setUploadLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await fetch(
-        `http://localhost:8080/api/admin/doctors/${doctorId}/${type}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: formData
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to upload ${type}`);
-      }
-
-      const updatedDoctor = await response.json();
-      setDoctor(updatedDoctor);
+      const result = await adminApi.uploadDoctorFile(doctorId, file, type);
+      // Update the doctor with the new file URL if needed
+      fetchDoctorDetails(); // Refresh doctor data
     } catch (err) {
-      setError(err.message);
+      console.error(`Error uploading ${type}:`, err);
+      setError(err.message || `Failed to upload ${type}`);
     } finally {
       setUploadLoading(false);
     }
@@ -104,25 +81,13 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/doctors/${doctorId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update doctor details');
-      }
-
-      const updatedDoctor = await response.json();
+      const updatedDoctor = await adminApi.updateDoctor(doctorId, formData);
       setDoctor(updatedDoctor);
       setIsEditing(false);
       onClose(true); // true indicates successful update
     } catch (err) {
-      setError(err.message);
+      console.error("Error updating doctor details:", err);
+      setError(err.message || 'Failed to update doctor details');
     } finally {
       setSaveLoading(false);
     }
@@ -156,7 +121,7 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
               <div className="profile-picture-section">
                 {doctor?.profilePicture ? (
                   <img 
-                    src={`http://localhost:8080/uploads/profile-pictures/${doctor.profilePicture}`}
+                    src={doctor.profilePicture}
                     alt="Doctor profile"
                     className="profile-picture"
                   />
@@ -180,8 +145,8 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
                   </div>
                 )}
               </div>
-              <div className="status-badge" data-status={doctor?.status.toLowerCase()}>
-                {doctor?.status}
+              <div className="status-badge" data-status={doctor?.status?.toLowerCase() || 'active'}>
+                {doctor?.status || 'ACTIVE'}
               </div>
             </div>
 

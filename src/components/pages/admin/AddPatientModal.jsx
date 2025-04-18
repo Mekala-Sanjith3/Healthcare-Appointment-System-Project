@@ -11,7 +11,9 @@ const AddPatientModal = ({ isOpen, onClose, onAdd }) => {
     address: '',
     bloodGroup: '',
     age: '',
-    gender: ''
+    gender: '',
+    role: 'PATIENT',
+    status: 'ACTIVE'
   });
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +41,9 @@ const AddPatientModal = ({ isOpen, onClose, onAdd }) => {
         address: '',
         bloodGroup: '',
         age: '',
-        gender: ''
+        gender: '',
+        role: 'PATIENT',
+        status: 'ACTIVE'
       });
       if (onAdd) onAdd();
       onClose();

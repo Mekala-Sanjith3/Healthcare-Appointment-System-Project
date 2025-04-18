@@ -103,4 +103,24 @@
   .form-section h4 {
     font-size: 1rem;
   }
+}
+
+/* Loading spinner styles */
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.loading-spinner i {
+  margin-right: 10px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

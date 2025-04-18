@@ -34,7 +34,7 @@ public class AdminService {
         return doctorRepository.findAll();
     }
 
-    public Doctor getDoctorById(Long id) {
+    public Doctor getDoctorById(String id) {
         return doctorRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Doctor not found with id: " + id));
     }
@@ -59,7 +59,7 @@ public class AdminService {
         return doctorRepository.save(doctor);
     }
 
-    public Doctor updateDoctor(Long id, UpdateDoctorRequest request) {
+    public Doctor updateDoctor(String id, UpdateDoctorRequest request) {
         Doctor doctor = getDoctorById(id);
 
         // Check if email is already in use by another doctor
@@ -83,7 +83,7 @@ public class AdminService {
         return doctorRepository.save(doctor);
     }
 
-    public Doctor updateDoctorStatus(Long id, String status) {
+    public Doctor updateDoctorStatus(String id, String status) {
         Doctor doctor = getDoctorById(id);
         
         // Update status
@@ -91,21 +91,21 @@ public class AdminService {
         return doctorRepository.save(doctor);
     }
 
-    public void deleteDoctor(Long id) {
+    public void deleteDoctor(String id) {
         if (!doctorRepository.existsById(id)) {
             throw new IllegalArgumentException("Doctor not found with id: " + id);
         }
         doctorRepository.deleteById(id);
     }
 
-    public Doctor uploadProfilePicture(Long id, MultipartFile file) throws IOException {
+    public Doctor uploadProfilePicture(String id, MultipartFile file) throws IOException {
         Doctor doctor = getDoctorById(id);
         String fileName = saveFile(file, "profile-pictures");
         doctor.setProfilePicture(fileName);
         return doctorRepository.save(doctor);
     }
 
-    public Doctor uploadCredentials(Long id, MultipartFile file) throws IOException {
+    public Doctor uploadCredentials(String id, MultipartFile file) throws IOException {
         Doctor doctor = getDoctorById(id);
         String fileName = saveFile(file, "credentials");
         doctor.setCredentialsFile(fileName);

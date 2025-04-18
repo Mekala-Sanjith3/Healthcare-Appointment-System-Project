@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminApi } from '../../../services/api';
 import DoctorProfileModal from './DoctorProfileModal';
 import '../../../styles/pages/admin/DoctorsList.css';
 
@@ -16,20 +17,13 @@ const DoctorsList = ({ searchTerm, filters }) => {
 
   const fetchDoctors = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/admin/doctors', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch doctors');
-      }
-
-      const data = await response.json();
+      const data = await adminApi.getAllDoctors();
+      console.log("Fetched doctors:", data);
       setDoctors(data);
+      setError(null);
     } catch (err) {
-      setError(err.message);
+      console.error("Error fetching doctors:", err);
+      setError(err.message || 'Failed to fetch doctors');
     } finally {
       setLoading(false);
     }
@@ -37,23 +31,12 @@ const DoctorsList = ({ searchTerm, filters }) => {
 
   const handleStatusChange = async (doctorId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/doctors/${doctorId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update doctor status');
-      }
-
+      await adminApi.updateDoctorStatus(doctorId, newStatus);
       // Refresh the doctors list
       fetchDoctors();
     } catch (err) {
-      setError(err.message);
+      console.error("Error updating doctor status:", err);
+      setError(err.message || 'Failed to update doctor status');
     }
   };
 
@@ -63,21 +46,12 @@ const DoctorsList = ({ searchTerm, filters }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/doctors/${doctorId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete doctor');
-      }
-
+      await adminApi.deleteDoctor(doctorId);
       // Refresh the doctors list
       fetchDoctors();
     } catch (err) {
-      setError(err.message);
+      console.error("Error deleting doctor:", err);
+      setError(err.message || 'Failed to delete doctor');
     }
   };
 
@@ -104,8 +78,8 @@ const DoctorsList = ({ searchTerm, filters }) => {
   const filteredDoctors = doctors.filter(doctor => {
     const matchesSearch = searchTerm.toLowerCase() === '' ||
       doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (doctor.specialization && doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (doctor.email && doctor.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesSpecialization = filters.specialization === '' ||
       doctor.specialization === filters.specialization;
@@ -137,74 +111,81 @@ const DoctorsList = ({ searchTerm, filters }) => {
   return (
     <>
       <div className="doctors-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Specialization</th>
-              <th>Experience</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredDoctors.map((doctor) => (
-              <tr key={doctor.id}>
-                <td>
-                  <div className="doctor-info">
-                    <div className="doctor-avatar">
-                      {doctor.name.charAt(0)}
-                    </div>
-                    <div className="doctor-details">
-                      <span className="doctor-name">{doctor.name}</span>
-                      <span className="doctor-qualification">{doctor.qualification}</span>
-                    </div>
-                  </div>
-                </td>
-                <td>{doctor.specialization}</td>
-                <td>{doctor.experience} years</td>
-                <td>{doctor.email}</td>
-                <td>
-                  <select
-                    className={`status-select status-${doctor.status.toLowerCase()}`}
-                    value={doctor.status}
-                    onChange={(e) => handleStatusChange(doctor.id, e.target.value)}
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </td>
-                <td>
-                  <div className="action-buttons">
-                    <button 
-                      className="view-btn" 
-                      title="View Details"
-                      onClick={() => handleViewProfile(doctor)}
-                    >
-                      <i className="fas fa-eye"></i>
-                    </button>
-                    <button 
-                      className="edit-btn" 
-                      title="Edit Doctor"
-                      onClick={() => handleEditProfile(doctor)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button 
-                      className="delete-btn" 
-                      title="Delete Doctor"
-                      onClick={() => handleDelete(doctor.id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </td>
+        {filteredDoctors.length === 0 ? (
+          <div className="empty-state">
+            <i className="fas fa-user-md"></i>
+            <p>No doctors found matching your criteria</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Specialization</th>
+                <th>Experience</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredDoctors.map((doctor) => (
+                <tr key={doctor.id}>
+                  <td>
+                    <div className="doctor-info">
+                      <div className="doctor-avatar">
+                        {doctor.name.charAt(0)}
+                      </div>
+                      <div className="doctor-details">
+                        <span className="doctor-name">{doctor.name}</span>
+                        <span className="doctor-qualification">{doctor.qualification}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{doctor.specialization}</td>
+                  <td>{doctor.experience} years</td>
+                  <td>{doctor.email}</td>
+                  <td>
+                    <select
+                      className={`status-select status-${doctor.status ? doctor.status.toLowerCase() : 'active'}`}
+                      value={doctor.status || 'ACTIVE'}
+                      onChange={(e) => handleStatusChange(doctor.id, e.target.value)}
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="INACTIVE">Inactive</option>
+                    </select>
+                  </td>
+                  <td>
+                    <div className="action-buttons">
+                      <button 
+                        className="view-btn" 
+                        title="View Details"
+                        onClick={() => handleViewProfile(doctor)}
+                      >
+                        <i className="fas fa-eye"></i>
+                      </button>
+                      <button 
+                        className="edit-btn" 
+                        title="Edit Doctor"
+                        onClick={() => handleEditProfile(doctor)}
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
+                      <button 
+                        className="delete-btn" 
+                        title="Delete Doctor"
+                        onClick={() => handleDelete(doctor.id)}
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {showProfileModal && selectedDoctor && (

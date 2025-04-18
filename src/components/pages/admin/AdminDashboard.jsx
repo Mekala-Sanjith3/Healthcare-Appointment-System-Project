@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DoctorsList from './DoctorsList';
 import PatientsList from './PatientsList';
@@ -8,6 +8,7 @@ import AddDoctorModal from './AddDoctorModal';
 import AddPatientModal from './AddPatientModal';
 import AddAppointmentModal from './AddAppointmentModal';
 import ChartConfigurator from './ChartConfigurator';
+import { adminApi } from '../../../services/api';
 import "../../../styles/pages/admin/AdminDashboard.css";
 
 const AdminDashboard = () => {
@@ -29,7 +30,17 @@ const AdminDashboard = () => {
     status: 'all',
     date: ''
   });
-  const [appointments, setAppointments] = useState([]);
+  const [refreshAppointments, setRefreshAppointments] = useState(0);
+
+  // Verify authentication on load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userRole = localStorage.getItem('userRole');
+    
+    if (!token || userRole !== 'ADMIN') {
+      navigate('/admin-login');
+    }
+  }, [navigate]);
 
   const handleLogout = () => {
     // Clear local storage
@@ -65,9 +76,9 @@ const AdminDashboard = () => {
 
   // Function to handle adding a new appointment
   const handleAddAppointment = (newAppointment) => {
-    setAppointments([newAppointment, ...appointments]);
     setShowAddAppointmentModal(false);
-    // In a real application, this would make an API call to save the appointment
+    // Trigger a refresh of the appointments list
+    setRefreshAppointments(prev => prev + 1);
   };
 
   return (
@@ -295,6 +306,7 @@ const AdminDashboard = () => {
               <AppointmentsList
                 searchTerm={searchTerm}
                 filters={appointmentFilters}
+                refreshTrigger={refreshAppointments}
               />
             </div>
           )}

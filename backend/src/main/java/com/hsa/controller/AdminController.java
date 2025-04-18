@@ -40,7 +40,7 @@ public class AdminController {
     }
 
     @GetMapping("/doctors/{id}")
-    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable Long id) {
+    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable String id) {
         Doctor doctor = adminService.getDoctorById(id);
         return ResponseEntity.ok(mapToDoctorResponse(doctor));
     }
@@ -53,7 +53,7 @@ public class AdminController {
 
     @PutMapping("/doctors/{id}")
     public ResponseEntity<DoctorResponse> updateDoctor(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody UpdateDoctorRequest request) {
         Doctor doctor = adminService.updateDoctor(id, request);
         return ResponseEntity.ok(mapToDoctorResponse(doctor));
@@ -61,7 +61,7 @@ public class AdminController {
 
     @PutMapping("/doctors/{id}/status")
     public ResponseEntity<DoctorResponse> updateDoctorStatus(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestBody UpdateDoctorStatusRequest request) {
         Doctor doctor = adminService.updateDoctorStatus(id, request.getStatus());
         return ResponseEntity.ok(mapToDoctorResponse(doctor));
@@ -69,7 +69,7 @@ public class AdminController {
 
     @PostMapping(value = "/doctors/{id}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DoctorResponse> uploadProfilePicture(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam("file") MultipartFile file) throws IOException {
         Doctor doctor = adminService.uploadProfilePicture(id, file);
         return ResponseEntity.ok(mapToDoctorResponse(doctor));
@@ -77,14 +77,14 @@ public class AdminController {
 
     @PostMapping(value = "/doctors/{id}/credentials", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DoctorResponse> uploadCredentials(
-            @PathVariable Long id,
+            @PathVariable String id,
             @RequestParam("file") MultipartFile file) throws IOException {
         Doctor doctor = adminService.uploadCredentials(id, file);
         return ResponseEntity.ok(mapToDoctorResponse(doctor));
     }
 
     @DeleteMapping("/doctors/{id}")
-    public ResponseEntity<Void> deleteDoctor(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteDoctor(@PathVariable String id) {
         adminService.deleteDoctor(id);
         return ResponseEntity.noContent().build();
     }

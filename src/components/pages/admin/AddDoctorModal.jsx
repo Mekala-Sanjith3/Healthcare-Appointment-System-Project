@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { adminApi } from '../../../services/api';
 import '../../../styles/pages/admin/AddDoctorModal.css';
 
 const AddDoctorModal = ({ isOpen, onClose, onAdd }) => {
@@ -9,39 +10,38 @@ const AddDoctorModal = ({ isOpen, onClose, onAdd }) => {
     specialization: '',
     qualification: '',
     experience: '',
-    clinicAddress: ''
+    clinicAddress: '',
+    role: 'DOCTOR',
+    status: 'ACTIVE'
   });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Clear error when user types
+    if (error) setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/admin/doctors', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add doctor');
-      }
-
+      console.log("Submitting doctor data:", formData);
+      await adminApi.createDoctor(formData);
+      
       onAdd();
       onClose();
     } catch (err) {
-      setError(err.message);
+      console.error("Error adding doctor:", err);
+      setError(err.message || 'Failed to add doctor');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,11 +151,23 @@ const AddDoctorModal = ({ isOpen, onClose, onAdd }) => {
           </div>
 
           <div className="form-actions">
-            <button type="button" className="cancel-button" onClick={onClose}>
+            <button 
+              type="button" 
+              className="cancel-button" 
+              onClick={onClose}
+            >
               Cancel
             </button>
-            <button type="submit" className="submit-button">
-              Add Doctor
+            <button 
+              type="submit" 
+              className="submit-button"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <><i className="fas fa-spinner fa-spin"></i> Adding...</>
+              ) : (
+                'Add Doctor'
+              )}
             </button>
           </div>
         </form>

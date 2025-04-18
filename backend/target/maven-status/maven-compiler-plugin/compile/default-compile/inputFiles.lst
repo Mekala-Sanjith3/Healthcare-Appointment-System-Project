@@ -1,22 +1,48 @@
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\dto\AdminRegistrationRequest.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\model\Doctor.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\model\Patient.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\repository\AdminRepository.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\config\SecurityConfig.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\HealthcareAppointmentSystemApplication.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\repository\DoctorRepository.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\repository\UserRepository.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\service\AuthenticationService.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\config\CorsConfig.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\config\JwtAuthenticationFilter.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\model\Admin.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\service\CustomUserDetailsService.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\dto\PatientRegistrationRequest.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\dto\DoctorRegistrationRequest.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\repository\PatientRepository.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\dto\LoginRequest.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\config\JwtService.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\controller\AuthController.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\dto\LoginResponse.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\model\User.java
-C:\Users\Mekal\HSA\Healthcare Appointment System\Healthcare_Appointment_System_Project\backend\src\main\java\com\hsa\config\WebConfig.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\DoctorService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\UpdateDoctorStatusRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\DoctorController.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\AvailabilityDTO.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\LoginResponse.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\UpdatePatientRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\DoctorProfileDTO.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\HealthcareAppointmentSystemApplication.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\impl\DoctorServiceImpl.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\WebConfig.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\AuthController.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\UpdateDoctorRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Doctor.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\AdminRegistrationRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\MedicalRecordRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Admin.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\UserRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\PatientHistoryDTO.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\CorsConfig.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\JwtService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\CreatePatientRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\MedicalRecord.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\SecurityConfig.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\SimpleResponse.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\AdminController.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\LoginRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\SecurityService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Patient.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\PatientRegistrationRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\User.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\exception\ResourceNotFoundException.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\CreateDoctorRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\AdminService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\DoctorRegistrationRequest.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Appointment.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\AuthenticationService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\DoctorResponse.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\AdminRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\DoctorRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\CustomUserDetailsService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\ApplicationConfig.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\PatientResponse.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\PatientRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\AppointmentRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Notification.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\impl\SecurityServiceImpl.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\repository\NotificationRepository.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\JwtAuthenticationFilter.java

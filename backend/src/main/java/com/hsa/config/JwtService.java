@@ -67,9 +67,14 @@ public class JwtService {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
+    
+    // Alias method for backward compatibility
+    public Boolean isTokenValid(String token, UserDetails userDetails) {
+        return validateToken(token, userDetails);
+    }
 
     private Key getSignKey() {
-        byte[] keyBytes = secretKey.getBytes();
+        byte[] keyBytes = java.util.Base64.getDecoder().decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 } 

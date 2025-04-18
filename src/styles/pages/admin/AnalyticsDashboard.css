@@ -16,7 +16,7 @@
 
 .loading-spinner {
   font-size: 3rem;
-  color: #4e73df;
+  color: #3498db;
   margin-bottom: 20px;
   animation: spin 1s linear infinite;
 }
@@ -105,7 +105,7 @@
   align-items: center;
   position: relative;
   overflow: hidden;
-  border-left: 4px solid #4e73df;
+  border-left: 4px solid #3498db;
   transition: transform 0.3s, box-shadow 0.3s;
 }
 
@@ -121,19 +121,19 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(78, 115, 223, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(to right, rgba(52, 152, 219, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
   z-index: 0;
 }
 
 .stats-card.total-appointments {
-  border-left-color: #4e73df;
+  border-left-color: #3498db;
 }
 
 .stats-card .stats-icon {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background-color: #4e73df;
+  background-color: #3498db;
   color: white;
   display: flex;
   align-items: center;
@@ -148,7 +148,7 @@
 }
 
 .stats-card .stats-icon.green {
-  background-color: #1cc88a;
+  background-color: #2ecc71;
 }
 
 .stats-card .stats-icon.yellow {
@@ -457,7 +457,7 @@
 
 .view-all-btn {
   padding: 6px 12px;
-  background-color: #4e73df;
+  background-color: #3498db;
   color: white;
   border: none;
   border-radius: 4px;
@@ -467,7 +467,7 @@
 }
 
 .view-all-btn:hover {
-  background-color: #375bcc;
+  background-color: #2c3e50;
 }
 
 .activity-list {
@@ -501,15 +501,15 @@
 }
 
 .activity-icon.blue {
-  background-color: #4e73df;
+  background-color: #3498db;
 }
 
 .activity-icon.green {
-  background-color: #1cc88a;
+  background-color: #2ecc71;
 }
 
 .activity-icon.red {
-  background-color: #e74a3b;
+  background-color: #e74c3c;
 }
 
 .activity-icon.yellow {

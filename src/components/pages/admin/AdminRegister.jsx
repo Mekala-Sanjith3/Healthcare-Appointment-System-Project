@@ -25,6 +25,9 @@ const AdminRegister = () => {
       ...prevState,
       [name]: value
     }));
+    
+    // Clear error when user starts typing
+    if (error) setError("");
   };
 
   const validateForm = () => {
@@ -32,6 +35,14 @@ const AdminRegister = () => {
       setError("Please fill in all required fields");
       return false;
     }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
+      return false;
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
@@ -40,6 +51,14 @@ const AdminRegister = () => {
       setError("Password must be at least 8 characters long");
       return false;
     }
+    
+    // Strong password validation (optional)
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!strongPasswordRegex.test(formData.password)) {
+      setError("Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character");
+      return false;
+    }
+    
     return true;
   };
 
@@ -56,18 +75,21 @@ const AdminRegister = () => {
         email: formData.email,
         password: formData.password,
         department: formData.department,
-        contactNumber: formData.contactNumber
+        contactNumber: formData.contactNumber || null
       };
 
-      await authApi.registerAdmin(requestData);
+      console.log("Submitting admin registration with data:", requestData);
+      const response = await authApi.registerAdmin(requestData);
+      console.log("Registration successful:", response);
+      
       setShowSuccessModal(true);
       setTimeout(() => {
         setShowSuccessModal(false);
         navigate('/admin-login');
       }, 2000);
     } catch (err) {
-      setError(err.message);
       console.error('Registration error:', err);
+      setError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -168,6 +190,9 @@ const AdminRegister = () => {
                     <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
                   </button>
                 </div>
+                <small className="password-hint">
+                  At least 8 characters with uppercase, lowercase, number, and special character
+                </small>
               </div>
 
               <div className="form-group">
@@ -249,7 +274,8 @@ const AdminRegister = () => {
           <div className="success-content">
             <i className="fas fa-check-circle"></i>
             <h3>Registration Successful!</h3>
-            <p>Redirecting to login page...</p>
+            <p>Your admin account has been created.</p>
+            <p>Redirecting to login...</p>
           </div>
         </div>
       )}

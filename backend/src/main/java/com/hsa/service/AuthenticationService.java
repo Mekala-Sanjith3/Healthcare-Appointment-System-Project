@@ -49,7 +49,7 @@ public class AuthenticationService {
         );
         patientRepository.save(patient);
         var token = jwtService.generateToken(patient);
-        return new LoginResponse(token, patient.getEmail(), patient.getRole(), patient.getId());
+        return new LoginResponse(token, patient.getEmail(), patient.getRole().name(), patient.getId().toString());
     }
 
     public LoginResponse registerAdmin(AdminRegistrationRequest request) {
@@ -62,16 +62,26 @@ public class AuthenticationService {
         );
         adminRepository.save(admin);
         var token = jwtService.generateToken(admin);
-        return new LoginResponse(token, admin.getEmail(), admin.getRole(), admin.getId());
+        return new LoginResponse(token, admin.getEmail(), admin.getRole().name(), admin.getId().toString());
     }
 
     public LoginResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
+        
+        // First try to find as doctor
+        var doctorOpt = doctorRepository.findByEmail(request.getEmail());
+        if (doctorOpt.isPresent()) {
+            var doctor = doctorOpt.get();
+            var token = jwtService.generateToken(doctor);
+            return new LoginResponse(token, doctor.getEmail(), doctor.getRole(), doctor.getId());
+        }
+        
+        // Then try to find as regular user
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
         var token = jwtService.generateToken(user);
-        return new LoginResponse(token, user.getEmail(), user.getRole(), user.getId());
+        return new LoginResponse(token, user.getEmail(), user.getRole().name(), user.getId().toString());
     }
 } 

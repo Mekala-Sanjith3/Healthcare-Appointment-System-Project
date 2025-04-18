@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
+import { adminApi } from '../../../services/api';
 import '../../../styles/pages/admin/AppointmentsList.css';
 
-const AppointmentsList = ({ searchTerm, filters }) => {
+const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   const [appointments, setAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -24,86 +25,26 @@ const AppointmentsList = ({ searchTerm, filters }) => {
   const appointmentsPrintRef = useRef();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for appointments
+  // Fetch appointments from API
   useEffect(() => {
-    // In a real app, this would be fetched from an API
-    const mockAppointments = [
-      { 
-        id: 1,
-        patientId: "P10023",
-        patientName: "Mekal Srujitha",
-        patientEmail: "mekal@example.com",
-        doctorId: "D0045",
-        doctorName: "Dr. Sarah Johnson",
-        doctorSpecialization: "Cardiology",
-        appointmentDate: "2023-08-15",
-        appointmentTime: "09:30 AM",
-        appointmentType: "Consultation",
-        status: "PENDING",
-        notes: "Follow-up on recent test results"
-      },
-      { 
-        id: 2,
-        patientId: "P10045",
-        patientName: "J Umesh Chandra",
-        patientEmail: "umesh@example.com",
-        doctorId: "D0032",
-        doctorName: "Dr. Michael Chen",
-        doctorSpecialization: "Dermatology",
-        appointmentDate: "2023-08-16",
-        appointmentTime: "11:00 AM",
-        appointmentType: "Check-up",
-        status: "PENDING",
-        notes: "First consultation for skin condition"
-      },
-      { 
-        id: 3,
-        patientId: "P10056",
-        patientName: "Mannava Ganesh",
-        patientEmail: "ganesh@example.com",
-        doctorId: "D0023",
-        doctorName: "Dr. Emily Wilson",
-        doctorSpecialization: "Neurology",
-        appointmentDate: "2023-08-17",
-        appointmentTime: "02:15 PM",
-        appointmentType: "Test Results",
-        status: "CONFIRMED",
-        notes: "Discuss MRI results"
-      },
-      { 
-        id: 4,
-        patientId: "P10078",
-        patientName: "Karthik Reddy",
-        patientEmail: "karthik@example.com",
-        doctorId: "D0045",
-        doctorName: "Dr. Sarah Johnson",
-        doctorSpecialization: "Cardiology",
-        appointmentDate: "2023-08-18",
-        appointmentTime: "10:45 AM",
-        appointmentType: "Follow-up",
-        status: "CANCELLED",
-        notes: "Patient requested cancellation"
-      },
-      { 
-        id: 5,
-        patientId: "P10089",
-        patientName: "Rahul Kumar",
-        patientEmail: "rahul@example.com",
-        doctorId: "D0032",
-        doctorName: "Dr. Michael Chen",
-        doctorSpecialization: "Dermatology",
-        appointmentDate: "2023-08-19",
-        appointmentTime: "03:30 PM",
-        appointmentType: "Consultation",
-        status: "CONFIRMED",
-        notes: "Post-surgery evaluation"
+    const fetchAppointments = async () => {
+      try {
+        setLoading(true);
+        const data = await adminApi.getAllAppointments();
+        setAppointments(data);
+        setFilteredAppointments(data);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        showToast('Failed to load appointments');
+      } finally {
+        setLoading(false);
       }
-    ];
-    
-    setAppointments(mockAppointments);
-    setFilteredAppointments(mockAppointments);
-  }, []);
+    };
+
+    fetchAppointments();
+  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
   // Filter appointments based on search term and filters
   useEffect(() => {
@@ -167,29 +108,37 @@ const AppointmentsList = ({ searchTerm, filters }) => {
   };
 
   // Save edited appointment
-  const handleSaveEdit = () => {
-    const updatedAppointment = {
-      ...selectedAppointment,
-      ...editFormData
-    };
-    
-    // Update appointment in the list
-    const updatedAppointments = appointments.map(app => 
-      app.id === updatedAppointment.id ? updatedAppointment : app
-    );
-    
-    setAppointments(updatedAppointments);
-    
-    // Update filtered appointments
-    if (filteredAppointments) {
-      const updatedFiltered = filteredAppointments.map(app => 
+  const handleSaveEdit = async () => {
+    try {
+      const updatedAppointment = {
+        ...selectedAppointment,
+        ...editFormData
+      };
+      
+      // Update appointment via API
+      await adminApi.updateAppointment(selectedAppointment.id, updatedAppointment);
+      
+      // Refresh appointments list
+      const updatedAppointments = appointments.map(app => 
         app.id === updatedAppointment.id ? updatedAppointment : app
       );
-      setFilteredAppointments(updatedFiltered);
+      
+      setAppointments(updatedAppointments);
+      
+      // Update filtered appointments
+      if (filteredAppointments) {
+        const updatedFiltered = filteredAppointments.map(app => 
+          app.id === updatedAppointment.id ? updatedAppointment : app
+        );
+        setFilteredAppointments(updatedFiltered);
+      }
+      
+      setShowEditModal(false);
+      showToast("Appointment updated successfully!");
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      showToast('Failed to update appointment');
     }
-    
-    setShowEditModal(false);
-    showToast("Appointment updated successfully!");
   };
 
   // Handle delete appointment
@@ -198,17 +147,28 @@ const AppointmentsList = ({ searchTerm, filters }) => {
     setConfirmDelete(true);
   };
 
-  const confirmDeleteAppointment = () => {
-    const updatedAppointments = appointments.filter(
-      appointment => appointment.id !== appointmentToDelete.id
-    );
-    
-    setAppointments(updatedAppointments);
-    setConfirmDelete(false);
-    setAppointmentToDelete(null);
-    
-    // Show success toast message
-    showToast("Appointment deleted successfully!");
+  const confirmDeleteAppointment = async () => {
+    try {
+      // Delete appointment via API
+      await adminApi.deleteAppointment(appointmentToDelete.id);
+      
+      const updatedAppointments = appointments.filter(
+        appointment => appointment.id !== appointmentToDelete.id
+      );
+      
+      setAppointments(updatedAppointments);
+      setFilteredAppointments(filteredAppointments.filter(
+        appointment => appointment.id !== appointmentToDelete.id
+      ));
+      setConfirmDelete(false);
+      setAppointmentToDelete(null);
+      
+      // Show success toast message
+      showToast("Appointment deleted successfully!");
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      showToast('Failed to delete appointment');
+    }
   };
 
   // Setup print functionality
@@ -453,140 +413,130 @@ const AppointmentsList = ({ searchTerm, filters }) => {
   };
 
   // Handle quick status change
-  const handleQuickStatusChange = (id, newStatus) => {
-    const updatedAppointments = appointments.map(appointment => {
-      if (appointment.id === id) {
-        return { ...appointment, status: newStatus };
-      }
-      return appointment;
-    });
-    
-    setAppointments(updatedAppointments);
-    showToast("Status updated successfully!");
+  const handleQuickStatusChange = async (id, newStatus) => {
+    try {
+      // Find the appointment to update
+      const appointmentToUpdate = appointments.find(appointment => appointment.id === id);
+      if (!appointmentToUpdate) return;
+      
+      const updatedAppointment = { ...appointmentToUpdate, status: newStatus };
+      
+      // Update via API
+      await adminApi.updateAppointment(id, updatedAppointment);
+      
+      // Update local state
+      const updatedAppointments = appointments.map(appointment => 
+        appointment.id === id ? updatedAppointment : appointment
+      );
+      
+      setAppointments(updatedAppointments);
+      setFilteredAppointments(filteredAppointments.map(appointment => 
+        appointment.id === id ? updatedAppointment : appointment
+      ));
+      
+      showToast(`Appointment status updated to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating appointment status:', error);
+      showToast('Failed to update appointment status');
+    }
   };
 
   return (
     <div className="appointments-list-container">
-      <div className="appointments-actions">
-        <button className="print-button" onClick={handlePrint}>
-          <i className="fas fa-print"></i> Print Appointments
-        </button>
-      </div>
-      
-      <div className="appointments-table-container" ref={appointmentsPrintRef}>
-        <table className="appointments-table">
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Doctor</th>
-              <th>Date & Time</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAppointments.length > 0 ? (
-              filteredAppointments.map(appointment => (
-                <tr key={appointment.id}>
-                  <td>
-                    <div className="user-info">
-                      <div className="user-avatar patient">
-                        {appointment.patientName.charAt(0)}
-                      </div>
-                      <div className="user-details">
-                        <span className="user-name">{appointment.patientName}</span>
-                        <span className="user-id">{appointment.patientId}</span>
-                      </div>
+      <div ref={appointmentsPrintRef} className="appointments-list">
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner">
+              <i className="fas fa-spinner fa-spin"></i>
+            </div>
+            <p>Loading appointments...</p>
+          </div>
+        ) : filteredAppointments.length > 0 ? (
+          <table className="appointments-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Patient</th>
+                <th>Doctor</th>
+                <th>Date & Time</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAppointments.map(appointment => (
+                <tr key={appointment.id} className="appointment-row">
+                  <td>{appointment.id}</td>
+                  <td className="patient-info">
+                    <div>{appointment.patientName}</div>
+                    <span className="patient-email">{appointment.patientEmail}</span>
+                  </td>
+                  <td className="doctor-info">
+                    <div>{appointment.doctorName}</div>
+                    <span className="doctor-specialization">{appointment.doctorSpecialization}</span>
+                  </td>
+                  <td className="appointment-datetime">
+                    <div>{appointment.appointmentDate}</div>
+                    <span className="appointment-time">{appointment.appointmentTime}</span>
+                  </td>
+                  <td>{appointment.appointmentType}</td>
+                  <td>{formatStatus(appointment.status)}</td>
+                  <td className="actions-cell">
+                    <div className="quick-status-update">
+                      <select 
+                        value={appointment.status}
+                        onChange={(e) => handleQuickStatusChange(appointment.id, e.target.value)}
+                        className={`status-select status-${appointment.status.toLowerCase()}`}
+                      >
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
                     </div>
-                  </td>
-                  <td>
-                    <div className="user-info">
-                      <div className="user-avatar doctor">
-                        {appointment.doctorName.split(' ')[1].charAt(0)}
-                      </div>
-                      <div className="user-details">
-                        <span className="user-name">{appointment.doctorName}</span>
-                        <span className="user-id">{appointment.doctorId}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="date-time">
-                      <div className="date">{appointment.appointmentDate}</div>
-                      <div className="time">{appointment.appointmentTime}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="appointment-type">{appointment.appointmentType}</span>
-                  </td>
-                  <td>
-                    <div className="status-dropdown">
-                      <div className="current-status">
-                        {formatStatus(appointment.status)}
-                        <i className="fas fa-chevron-down"></i>
-                      </div>
-                      <div className="status-options">
-                        <div 
-                          className={`status-option ${appointment.status === 'CONFIRMED' ? 'active' : ''}`}
-                          onClick={() => handleQuickStatusChange(appointment.id, 'CONFIRMED')}
-                        >
-                          <span className="status-badge confirmed">Confirmed</span>
-                        </div>
-                        <div 
-                          className={`status-option ${appointment.status === 'PENDING' ? 'active' : ''}`}
-                          onClick={() => handleQuickStatusChange(appointment.id, 'PENDING')}
-                        >
-                          <span className="status-badge pending">Pending</span>
-                        </div>
-                        <div 
-                          className={`status-option ${appointment.status === 'CANCELLED' ? 'active' : ''}`}
-                          onClick={() => handleQuickStatusChange(appointment.id, 'CANCELLED')}
-                        >
-                          <span className="status-badge cancelled">Cancelled</span>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="actions">
                     <button 
-                      className="action-button view" 
+                      className="view-btn"
                       onClick={() => handleViewAppointment(appointment)}
-                      title="View Details"
                     >
                       <i className="fas fa-eye"></i>
                     </button>
                     <button 
                       className="edit-btn"
                       onClick={() => handleEditAppointment(appointment)}
-                      title="Edit Appointment"
                     >
                       <i className="fas fa-edit"></i>
                     </button>
                     <button 
-                      className="print-btn"
-                      onClick={() => handlePrintAppointment(appointment)}
-                      title="Print Appointment"
-                    >
-                      <i className="fas fa-print"></i>
-                    </button>
-                    <button 
                       className="delete-btn"
                       onClick={() => handleDeleteClick(appointment)}
-                      title="Cancel Appointment"
                     >
                       <i className="fas fa-trash-alt"></i>
                     </button>
+                    <button 
+                      className="print-btn"
+                      onClick={() => handlePrintAppointment(appointment)}
+                    >
+                      <i className="fas fa-print"></i>
+                    </button>
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="no-data">No appointments found.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="no-appointments">
+            <i className="fas fa-calendar-times"></i>
+            <h3>No appointments found</h3>
+            <p>Try adjusting your search or filters</p>
+          </div>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div className="appointments-actions">
+        <button className="print-all-btn" onClick={handlePrint}>
+          <i className="fas fa-print"></i> Print All Appointments
+        </button>
       </div>
       
       {/* View Appointment Modal */}

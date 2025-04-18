@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import '../../../styles/pages/admin/MedicalRecordsView.css';
 
 const MedicalRecordsView = ({ patient }) => {
@@ -34,6 +34,7 @@ const MedicalRecordsView = ({ patient }) => {
 
   const [activeRecord, setActiveRecord] = useState(null);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
+  const printRecordRef = useRef(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -61,6 +62,181 @@ const MedicalRecordsView = ({ patient }) => {
     setIsAddingRecord(false);
   };
 
+  const handlePrint = () => {
+    const printContents = printRecordRef.current.innerHTML;
+    const originalContents = document.body.innerHTML;
+    
+    const printStyles = `
+      <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        h1 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2 { color: #3498db; margin-top: 20px; }
+        .print-header { margin-bottom: 30px; }
+        .print-section { margin-bottom: 25px; }
+        .print-row { display: flex; margin-bottom: 10px; }
+        .print-label { font-weight: bold; width: 150px; }
+        .print-value { flex: 1; }
+        .record-meta { color: #7f8c8d; margin-bottom: 15px; font-size: 0.9em; }
+        .section-title { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 15px; }
+        .content-section { margin-bottom: 25px; }
+        @media print {
+          body { margin: 0; padding: 20px; }
+        }
+      </style>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Medical Record - ${patient?.name || 'Patient'}</title>
+          ${printStyles}
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="print-header">
+              <h1>Medical Record</h1>
+              <p>Patient: ${patient?.name || 'N/A'} (ID: ${patient?.id || 'N/A'})</p>
+              <p>Date Generated: ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <div class="print-section">
+              <h2 class="section-title">Record Information</h2>
+              <div class="print-row">
+                <div class="print-label">Title:</div>
+                <div class="print-value">${records.find(r => r.id === activeRecord)?.title || 'N/A'}</div>
+              </div>
+              <div class="print-row">
+                <div class="print-label">Record Type:</div>
+                <div class="print-value">${records.find(r => r.id === activeRecord)?.recordType || 'N/A'}</div>
+              </div>
+              <div class="print-row">
+                <div class="print-label">Date:</div>
+                <div class="print-value">${records.find(r => r.id === activeRecord)?.date || 'N/A'}</div>
+              </div>
+              <div class="print-row">
+                <div class="print-label">Doctor:</div>
+                <div class="print-value">${records.find(r => r.id === activeRecord)?.doctorName || 'N/A'}</div>
+              </div>
+            </div>
+            
+            <div class="content-section">
+              <h2 class="section-title">Description</h2>
+              <p>${records.find(r => r.id === activeRecord)?.description || 'No description available.'}</p>
+            </div>
+            
+            <div class="content-section">
+              <h2 class="section-title">Prescriptions</h2>
+              <p>${records.find(r => r.id === activeRecord)?.prescriptions || 'None'}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Add a small delay to ensure styles are loaded
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  // Function to print all medical records
+  const handlePrintAllRecords = () => {
+    const printStyles = `
+      <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        h1 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h2 { color: #3498db; margin-top: 20px; }
+        h3 { color: #2980b9; margin-top: 30px; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+        .print-header { margin-bottom: 30px; }
+        .record-container { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+        .record-container:last-child { border-bottom: none; }
+        .print-section { margin-bottom: 25px; }
+        .print-row { display: flex; margin-bottom: 10px; }
+        .print-label { font-weight: bold; width: 150px; }
+        .print-value { flex: 1; }
+        .section-title { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 15px; }
+        .content-section { margin-bottom: 25px; }
+        @media print {
+          body { margin: 0; padding: 20px; }
+          .page-break { page-break-before: always; }
+        }
+      </style>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>All Medical Records - ${patient?.name || 'Patient'}</title>
+          ${printStyles}
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="print-header">
+              <h1>Medical Records Summary</h1>
+              <p>Patient: ${patient?.name || 'N/A'} (ID: ${patient?.id || 'N/A'})</p>
+              <p>Date Generated: ${new Date().toLocaleDateString()}</p>
+              <p>Total Records: ${records.length}</p>
+            </div>
+    `);
+    
+    // Add each record
+    records.forEach((record, index) => {
+      printWindow.document.write(`
+        <div class="record-container ${index > 0 ? 'page-break' : ''}">
+          <h3>${record.title}</h3>
+          
+          <div class="print-section">
+            <h4 class="section-title">Record Information</h4>
+            <div class="print-row">
+              <div class="print-label">Record Type:</div>
+              <div class="print-value">${record.recordType}</div>
+            </div>
+            <div class="print-row">
+              <div class="print-label">Date:</div>
+              <div class="print-value">${record.date}</div>
+            </div>
+            <div class="print-row">
+              <div class="print-label">Doctor:</div>
+              <div class="print-value">${record.doctorName}</div>
+            </div>
+          </div>
+          
+          <div class="content-section">
+            <h4 class="section-title">Description</h4>
+            <p>${record.description}</p>
+          </div>
+          
+          <div class="content-section">
+            <h4 class="section-title">Prescriptions</h4>
+            <p>${record.prescriptions || 'None'}</p>
+          </div>
+        </div>
+      `);
+    });
+    
+    printWindow.document.write(`
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Add a small delay to ensure styles are loaded
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const getRecordTypeIcon = (type) => {
     switch (type) {
       case 'Consultation':
@@ -82,13 +258,23 @@ const MedicalRecordsView = ({ patient }) => {
     <div className="medical-records-view">
       <div className="records-header">
         <h2>Medical Records</h2>
-        <button 
-          className="add-record-btn"
-          onClick={() => setIsAddingRecord(true)}
-        >
-          <i className="fas fa-plus"></i>
-          Add Record
-        </button>
+        <div className="header-actions">
+          <button 
+            className="print-all-btn"
+            onClick={handlePrintAllRecords}
+            disabled={records.length === 0}
+          >
+            <i className="fas fa-print"></i>
+            Print All Records
+          </button>
+          <button 
+            className="add-record-btn"
+            onClick={() => setIsAddingRecord(true)}
+          >
+            <i className="fas fa-plus"></i>
+            Add Record
+          </button>
+        </div>
       </div>
 
       <div className="records-container">
@@ -120,13 +306,13 @@ const MedicalRecordsView = ({ patient }) => {
 
         <div className="record-details">
           {activeRecord ? (
-            <div className="record-content">
+            <div className="record-content" ref={printRecordRef}>
               {records.find(r => r.id === activeRecord) && (
                 <>
                   <div className="record-header">
                     <h3>{records.find(r => r.id === activeRecord).title}</h3>
                     <div className="record-actions">
-                      <button className="action-btn">
+                      <button className="action-btn" onClick={handlePrint}>
                         <i className="fas fa-print"></i>
                         Print
                       </button>

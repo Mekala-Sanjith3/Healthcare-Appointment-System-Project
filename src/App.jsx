@@ -1,16 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
-import './styles/App.css';
+import './styles/global.css';
+import { initializeApp } from './utils/initApp';
 
-function App() {
+const App = () => {
+  // Initialize app data when the application starts
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
   return (
-    <Router>
-      <div className="App">
+    <div className="app">
+      <Router>
         <AppRoutes />
-      </div>
-    </Router>
+      </Router>
+    </div>
   );
-}
+};
 
 export default App;
