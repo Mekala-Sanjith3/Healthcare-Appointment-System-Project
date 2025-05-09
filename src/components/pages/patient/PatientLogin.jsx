@@ -155,14 +155,7 @@ const PatientLogin = () => {
             </form>
 
             <div className="login-footer">
-              <p>New patient?</p>
-              <button 
-                className="register-link"
-                onClick={() => navigate('/patient-register')}
-              >
-                <i className="fas fa-user-plus"></i>
-                Register Now
-              </button>
+              {/* Registration option removed as per requirements */}
             </div>
 
             <div className="security-note">

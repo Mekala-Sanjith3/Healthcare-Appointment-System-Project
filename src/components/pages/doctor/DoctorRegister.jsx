@@ -35,12 +35,24 @@ const DoctorRegister = () => {
       setError("Please fill in all required fields");
       return false;
     }
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
+      return false;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters long");
+      return false;
+    }
+    // Strong password validation
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!strongPasswordRegex.test(formData.password)) {
+      setError("Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character");
       return false;
     }
     return true;
@@ -75,17 +87,17 @@ const DoctorRegister = () => {
         specialization: formData.specialization,
         qualification: formData.qualification,
         experience: formData.experience,
-        clinicAddress: formData.clinicAddress
+        clinicAddress: formData.clinicAddress || null
       };
 
-      await authApi.registerDoctor(requestData);
+      const response = await authApi.registerDoctor(requestData);
       setShowSuccessModal(true);
       setTimeout(() => {
         setShowSuccessModal(false);
         navigate('/doctor-login');
       }, 2000);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Registration failed. Please try again.");
       console.error('Registration error:', err);
     } finally {
       setIsLoading(false);

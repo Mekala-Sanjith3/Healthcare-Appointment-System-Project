@@ -108,6 +108,10 @@
   margin-bottom: 1.5rem;
   display: block;
   animation: pulse 2s infinite;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: none !important;
 }
 
 @keyframes pulse {

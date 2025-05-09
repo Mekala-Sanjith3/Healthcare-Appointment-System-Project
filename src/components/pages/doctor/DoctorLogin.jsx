@@ -155,19 +155,7 @@ const DoctorLogin = () => {
             </form>
 
             <div className="login-footer">
-              <p>
-                Don't have an account?{" "}
-                <a href="/doctor-register" className="register-link">
-                  <i className="fas fa-user-plus"></i>
-                  Register here
-                </a>
-              </p>
-              <div className="divider">or</div>
-              <p>Need help?</p>
-              <a href="#" className="support-link">
-                <i className="fas fa-headset"></i>
-                Contact Support
-              </a>
+              {/* Registration option removed as per requirements */}
             </div>
 
             <div className="security-note">
