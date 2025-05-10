@@ -245,11 +245,11 @@ const DoctorDashboard = () => {
     const fetchPatients = async () => {
       setIsLoading(prev => ({ ...prev, patients: true }));
       try {
-        // Try to fetch the doctor's patients from the API
-        const result = await doctorApi.getDoctorPatients(doctor.id);
+        // Get only patients who have booked appointments with this doctor
+        const result = await doctorApi.getPatientsWithAppointments(doctor.id);
         setPatients(result);
       } catch (err) {
-        console.error("Failed to fetch patients:", err);
+        console.error("Failed to fetch patients with appointments:", err);
         setError("Failed to load patients. Please refresh the page.");
       } finally {
         setIsLoading(prev => ({ ...prev, patients: false }));
@@ -838,7 +838,20 @@ const DoctorDashboard = () => {
                 />
               </div>
             </div>
-            
+
+            <div className="card-header">
+              <h2>Patients Who Booked Appointments</h2>
+              <div className="search-filters">
+                <input 
+                  type="text" 
+                  placeholder="Search patients by name..." 
+                  className="search-input"
+                  value={patientSearchQuery}
+                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="patients-grid">
               {isLoading.patients ? (
                 <div className="loading-spinner">Loading patients...</div>
@@ -847,11 +860,8 @@ const DoctorDashboard = () => {
                   <table>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Age/Gender</th>
-                        <th>Contact</th>
-                        <th>Last Visit</th>
-                        <th>Status</th>
+                        <th>Patient Name</th>
+                        <th>Last Appointment</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -865,24 +875,11 @@ const DoctorDashboard = () => {
                               </div>
                               <div className="patient-name">
                                 {patient.name}
-                                <span className="patient-id">{patient.id}</span>
                               </div>
-                            </div>
-                          </td>
-                          <td>{patient.age} / {patient.gender}</td>
-                          <td>
-                            <div className="patient-contact">
-                              <div>{patient.email}</div>
-                              <div>{patient.phoneNumber}</div>
                             </div>
                           </td>
                           <td>
                             {patient.lastVisit || 'No visits yet'}
-                          </td>
-                          <td>
-                            <span className={`status ${patient.status ? patient.status.toLowerCase() : 'active'}`}>
-                              {patient.status || 'Active'}
-                            </span>
                           </td>
                           <td>
                             <div className="action-buttons">

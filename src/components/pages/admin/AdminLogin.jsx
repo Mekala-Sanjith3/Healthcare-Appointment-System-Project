@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../../services/api";
+import ReCAPTCHA from "react-google-recaptcha";
 import "../../../styles/pages/admin/AdminLogin.css";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const recaptchaRef = useRef();
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
@@ -12,6 +14,7 @@ const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,16 +27,27 @@ const AdminLogin = () => {
     if (error) setError("");
   };
 
+  const handleCaptchaChange = (token) => {
+    setCaptchaToken(token);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
     
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification");
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       console.log("Attempting login with credentials:", { ...credentials, role: "ADMIN" });
       const response = await authApi.login({
         ...credentials,
-        role: "ADMIN"
+        role: "ADMIN",
+        captchaToken
       });
       
       console.log("Login successful:", response);
@@ -51,6 +65,9 @@ const AdminLogin = () => {
     } catch (err) {
       console.error("Login error:", err);
       setError(err.message || "Login failed. Please try again.");
+      // Reset captcha on error
+      recaptchaRef.current.reset();
+      setCaptchaToken("");
     } finally {
       setIsLoading(false);
     }
@@ -146,10 +163,18 @@ const AdminLogin = () => {
                 </a>
               </div>
 
+              <div className="captcha-container">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // Replace with your site key in production
+                  onChange={handleCaptchaChange}
+                />
+              </div>
+
               <button 
                 type="submit" 
                 className={`login-button ${isLoading ? 'loading' : ''}`}
-                disabled={isLoading}
+                disabled={isLoading || !captchaToken}
               >
                 {isLoading ? (
                   <>

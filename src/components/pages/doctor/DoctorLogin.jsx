@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../common/Button/button";
 import { Input } from "../../common/Input/input";
 import { authApi } from "../../../services/api";
+import ReCAPTCHA from "react-google-recaptcha";
 import "../../../styles/pages/doctor/DoctorLogin.css";
 
 const DoctorLogin = () => {
   const navigate = useNavigate();
+  const recaptchaRef = useRef();
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
@@ -14,16 +16,28 @@ const DoctorLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+
+  const handleCaptchaChange = (token) => {
+    setCaptchaToken(token);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
     
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification");
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       const response = await authApi.login({
         ...credentials,
-        role: "DOCTOR"
+        role: "DOCTOR",
+        captchaToken
       });
       
       // Store token and user data
@@ -38,6 +52,9 @@ const DoctorLogin = () => {
       navigate('/doctor');
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
+      // Reset captcha on error
+      recaptchaRef.current.reset();
+      setCaptchaToken("");
     } finally {
       setIsLoading(false);
     }
@@ -135,10 +152,18 @@ const DoctorLogin = () => {
                 </a>
               </div>
 
+              <div className="captcha-container">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // Replace with your site key in production
+                  onChange={handleCaptchaChange}
+                />
+              </div>
+
               <button 
                 type="submit" 
                 className={`login-button ${isLoading ? 'loading' : ''}`}
-                disabled={isLoading}
+                disabled={isLoading || !captchaToken}
               >
                 {isLoading ? (
                   <>

@@ -399,6 +399,11 @@ export const authApi = {
             if (process.env.NODE_ENV === 'development' || true) { // Force mock for now
                 console.log("Falling back to mock login implementation");
                 
+                // Check if captcha token is provided
+                if (!credentials.captchaToken) {
+                    throw new Error("CAPTCHA verification required");
+                }
+                
                 // Check mock database for credentials
                 let foundUser = null;
                 
@@ -430,11 +435,6 @@ export const authApi = {
                 // Store authentication data
                 localStorage.setItem('token', mockResponse.token);
                 localStorage.setItem('userRole', mockResponse.role);
-                localStorage.setItem('userData', JSON.stringify({
-                    id: mockResponse.userId,
-                    email: mockResponse.email,
-                    role: mockResponse.role
-                }));
                 
                 return mockResponse;
             }
@@ -796,6 +796,29 @@ export const doctorApi = {
         }
     },
     
+    getAvailableTimeSlots: async (doctorId, date) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/appointments/available/${doctorId}/${date}`, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to fetch available time slots for doctor ${doctorId} on ${date}:`, error.message);
+            console.log('Using mock implementation for available time slots');
+            
+            // Generate mock time slots (9 AM to 5 PM, 30-minute intervals)
+            const mockTimeSlots = [];
+            for (let hour = 9; hour < 17; hour++) {
+                mockTimeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
+                mockTimeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+            }
+            
+            // Maybe randomly remove some slots to simulate booked appointments
+            return mockTimeSlots.filter(() => Math.random() > 0.3); // Randomly keep ~70% of slots
+        }
+    },
+    
     getDoctorNotifications: async (id) => {
         try {
             const response = await fetch(`${API_BASE_URL}/doctors/${id}/notifications`, {
@@ -827,6 +850,41 @@ export const doctorApi = {
                 { id: 'P067', name: 'Sarah Williams', age: 50, gender: 'Female', email: 'sarah.w@example.com', phone: '555-246-8135', address: '321 Cedar Ln, Newcity', bloodGroup: 'AB+', lastVisit: '2023-04-10', status: 'ACTIVE' },
                 { id: 'P089', name: 'Michael Brown', age: 45, gender: 'Male', email: 'michael.b@example.com', phone: '555-369-2580', address: '654 Maple Dr, Oldtown', bloodGroup: 'O-', lastVisit: '2023-03-18', status: 'ACTIVE' }
             ];
+        }
+    },
+    
+    getPatientsWithAppointments: async (doctorId) => {
+        try {
+            // First, get all appointments for this doctor
+            const appointments = await appointmentApi.getAppointmentsByDoctorId(doctorId);
+            
+            if (!appointments || appointments.length === 0) {
+                return [];
+            }
+            
+            // Extract unique patient IDs from appointments
+            const patientIds = new Set();
+            const patientsMap = new Map();
+            
+            appointments.forEach(appointment => {
+                if (appointment.patientId && !patientIds.has(appointment.patientId)) {
+                    patientIds.add(appointment.patientId);
+                    
+                    // Create a simplified patient object
+                    patientsMap.set(appointment.patientId, {
+                        id: appointment.patientId,
+                        name: appointment.patientName || 'Unknown Patient',
+                        // Get the most recent appointment date for this patient
+                        lastVisit: appointment.appointmentDate || 'N/A'
+                    });
+                }
+            });
+            
+            // Convert the map values to an array
+            return Array.from(patientsMap.values());
+        } catch (error) {
+            console.error('Error fetching patients with appointments:', error.message);
+            return [];
         }
     },
 
@@ -1652,7 +1710,7 @@ export const adminApi = {
     // Appointment management endpoints
     getAllAppointments: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/admin/appointments`, {
+            const response = await fetch(`${API_BASE_URL}/appointments`, {
                 headers: getHeaders()
             });
             
@@ -2211,5 +2269,199 @@ export const notificationApi = {
             console.error(`Failed to get unread count for user ${userId}:`, error.message);
             return 0;
         }
+    }
+};
+
+// Add the payment API service
+export const paymentApi = {
+    processPayment: async (paymentData) => {
+        try {
+            console.log('Processing payment:', paymentData);
+            
+            // In a real implementation, this would call a payment gateway API
+            const response = await fetch(`${API_BASE_URL}/payments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(paymentData)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Payment processing failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData
+                });
+                throw new Error(errorData.message || 'Failed to process payment');
+            }
+            
+            const responseData = await response.json();
+            console.log('Payment processed successfully:', responseData);
+            
+            // Store payment in localStorage for development purposes
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            payments.push(responseData);
+            localStorage.setItem('payments', JSON.stringify(payments));
+            
+            return responseData;
+        } catch (error) {
+            console.error('Failed to process payment:', error);
+            
+            // For development, create a mock payment response
+            const mockPayment = {
+                id: `payment_${Date.now()}`,
+                status: 'COMPLETED',
+                amount: paymentData.amount,
+                currency: paymentData.currency || 'USD',
+                paymentMethod: paymentData.paymentMethod,
+                transactionId: `txn_${Date.now()}${Math.floor(Math.random() * 10000)}`,
+                createdAt: new Date().toISOString(),
+                cardDetails: paymentData.paymentMethod === 'CARD' ? {
+                    lastFourDigits: paymentData.cardNumber ? paymentData.cardNumber.slice(-4) : '1234',
+                    cardType: paymentData.cardType || 'Visa',
+                    expiryMonth: paymentData.expiryMonth || '12',
+                    expiryYear: paymentData.expiryYear || '25'
+                } : null,
+                insurance: paymentData.paymentMethod === 'INSURANCE' ? {
+                    provider: paymentData.insuranceProvider || 'Unknown',
+                    policyNumber: paymentData.policyNumber || '123456789',
+                    coveragePercentage: paymentData.coveragePercentage || 80
+                } : null
+            };
+            
+            // Store in localStorage
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            payments.push(mockPayment);
+            localStorage.setItem('payments', JSON.stringify(payments));
+            
+            return mockPayment;
+        }
+    },
+    
+    getPaymentById: async (paymentId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/${paymentId}`, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to fetch payment ${paymentId}:`, error.message);
+            
+            // For development, check localStorage
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            const payment = payments.find(p => p.id === paymentId);
+            
+            if (payment) {
+                return payment;
+            }
+            
+            throw error;
+        }
+    },
+    
+    getPaymentsByPatientId: async (patientId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/patient/${patientId}`, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to fetch payments for patient ${patientId}:`, error.message);
+            
+            // For development, check localStorage
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            return payments.filter(p => p.patientId === patientId);
+        }
+    },
+    
+    getPaymentsByAppointmentId: async (appointmentId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/appointment/${appointmentId}`, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to fetch payments for appointment ${appointmentId}:`, error.message);
+            
+            // For development, check localStorage
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            return payments.filter(p => p.appointmentId === appointmentId);
+        }
+    },
+    
+    refundPayment: async (paymentId, refundData) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/refund`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(refundData)
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to refund payment ${paymentId}:`, error.message);
+            
+            // For development, create a mock refund
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            const paymentIndex = payments.findIndex(p => p.id === paymentId);
+            
+            if (paymentIndex >= 0) {
+                payments[paymentIndex] = {
+                    ...payments[paymentIndex],
+                    status: 'REFUNDED',
+                    refundedAt: new Date().toISOString(),
+                    refundReason: refundData.reason || 'Customer requested'
+                };
+                
+                localStorage.setItem('payments', JSON.stringify(payments));
+                return payments[paymentIndex];
+            }
+            
+            throw error;
+        }
+    }
+};
+
+// Update the appointmentApi.createAppointment function to include payment information
+const originalCreateAppointment = appointmentApi.createAppointment;
+appointmentApi.createAppointment = async (appointmentData) => {
+    try {
+        // Check if payment information is included
+        if (appointmentData.paymentId) {
+            console.log('Creating appointment with payment information:', {
+                paymentId: appointmentData.paymentId,
+                paymentStatus: appointmentData.paymentStatus,
+                paymentAmount: appointmentData.paymentAmount
+            });
+        }
+        
+        // Call the original implementation
+        const response = await originalCreateAppointment(appointmentData);
+        
+        // If payment info is included, update the payment with the appointment ID
+        if (appointmentData.paymentId) {
+            const payments = JSON.parse(localStorage.getItem('payments') || '[]');
+            const paymentIndex = payments.findIndex(p => p.id === appointmentData.paymentId);
+            
+            if (paymentIndex >= 0) {
+                payments[paymentIndex] = {
+                    ...payments[paymentIndex],
+                    appointmentId: response.id
+                };
+                
+                localStorage.setItem('payments', JSON.stringify(payments));
+            }
+        }
+        
+        return response;
+    } catch (error) {
+        console.error('Failed to create appointment with payment:', error);
+        throw error;
     }
 };

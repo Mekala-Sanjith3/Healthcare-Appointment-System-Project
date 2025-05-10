@@ -88,7 +88,7 @@ router.get('/:id', auth(['admin', 'doctor', 'patient']), async (req, res) => {
     `;
     const [appointments] = await db.query(query, [req.params.id]);
     
-    if (appointments.length === 0) {
+    if (appointments.length === 0) { 
       return res.status(404).json({ message: 'Appointment not found' });
     }
     

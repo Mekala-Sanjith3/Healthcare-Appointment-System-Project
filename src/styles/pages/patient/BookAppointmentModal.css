@@ -471,4 +471,76 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* Add the payment-related styles after the success-message section */
+
+/* Payment Summary Styles */
+.payment-summary {
+  margin-top: 20px;
+  background-color: #f0f9ff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+}
+
+.payment-confirmation {
+  color: #1e40af;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.payment-confirmation i {
+  color: #3b82f6;
+  font-size: 1.2rem;
+}
+
+.payment-method, .transaction-id {
+  color: #4b5563;
+  font-size: 0.9rem;
+  margin: 5px 0;
+}
+
+/* Modified success-message styles to accommodate payment info */
+.success-message {
+  text-align: center;
+  padding: 30px;
+}
+
+.close-success-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background-color: #4e73df;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px auto 0;
+  transition: all 0.2s ease;
+}
+
+.close-success-btn:hover {
+  background-color: #375bcc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(78, 115, 223, 0.2);
+}
+
+/* Update stepper for 5 steps */
+@media (max-width: 768px) {
+  .stepper::before {
+    left: 25px;
+    right: 25px;
+  }
+  
+  .step-label {
+    font-size: 0.7rem;
+  }
 } 

@@ -27,6 +27,12 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   const [appointmentToDelete, setAppointmentToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Add new state for doctor and patient filtering
+  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState('');
+
   // Fetch appointments from API
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -35,6 +41,13 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
         const data = await adminApi.getAllAppointments();
         setAppointments(data);
         setFilteredAppointments(data);
+        
+        // Extract unique doctors and patients for filtering
+        const uniqueDoctors = [...new Set(data.map(app => app.doctorName))].sort();
+        const uniquePatients = [...new Set(data.map(app => app.patientName))].sort();
+        
+        setDoctors(uniqueDoctors);
+        setPatients(uniquePatients);
       } catch (error) {
         console.error('Error fetching appointments:', error);
         showToast('Failed to load appointments');
@@ -46,18 +59,30 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
     fetchAppointments();
   }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
-  // Filter appointments based on search term and filters
+  // Filter appointments based on search term, filters, selected doctor and patient
   useEffect(() => {
     let result = [...appointments];
     
-    // Filter by search term
+    // Filter by search term (case insensitive)
     if (searchTerm) {
       const lowercasedSearch = searchTerm.toLowerCase();
       result = result.filter(
         appointment => 
           appointment.patientName.toLowerCase().includes(lowercasedSearch) ||
-          appointment.doctorName.toLowerCase().includes(lowercasedSearch)
+          appointment.doctorName.toLowerCase().includes(lowercasedSearch) ||
+          appointment.patientId?.toLowerCase().includes(lowercasedSearch) ||
+          appointment.doctorId?.toLowerCase().includes(lowercasedSearch)
       );
+    }
+    
+    // Filter by selected doctor
+    if (selectedDoctor) {
+      result = result.filter(appointment => appointment.doctorName === selectedDoctor);
+    }
+    
+    // Filter by selected patient
+    if (selectedPatient) {
+      result = result.filter(appointment => appointment.patientName === selectedPatient);
     }
     
     // Filter by status
@@ -71,7 +96,32 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
     }
     
     setFilteredAppointments(result);
-  }, [appointments, searchTerm, filters]);
+  }, [appointments, searchTerm, filters, selectedDoctor, selectedPatient]);
+
+  // Handle doctor selection change
+  const handleDoctorChange = (e) => {
+    setSelectedDoctor(e.target.value);
+    // Clear patient selection when doctor is selected
+    if (e.target.value) {
+      setSelectedPatient('');
+    }
+  };
+
+  // Handle patient selection change
+  const handlePatientChange = (e) => {
+    setSelectedPatient(e.target.value);
+    // Clear doctor selection when patient is selected
+    if (e.target.value) {
+      setSelectedDoctor('');
+    }
+  };
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSelectedDoctor('');
+    setSelectedPatient('');
+    setFilteredAppointments(appointments);
+  };
 
   // Handle viewing appointment details
   const handleViewAppointment = (appointment) => {
@@ -174,8 +224,81 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   // Setup print functionality
   const handlePrint = useReactToPrint({
     content: () => appointmentsPrintRef.current,
-    documentTitle: "Appointments List",
-    onAfterPrint: () => console.log("Print completed")
+    documentTitle: `Healthcare_Appointments_List${selectedDoctor ? `_Doctor_${selectedDoctor.replace(/\s+/g, '_')}` : ''}${selectedPatient ? `_Patient_${selectedPatient.replace(/\s+/g, '_')}` : ''}`,
+    pageStyle: `
+      @page {
+        size: landscape;
+        margin: 10mm;
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th, td {
+          padding: 8px;
+          border: 1px solid #ddd;
+          font-size: 11px;
+        }
+        th {
+          background-color: #f0f0f0;
+          font-weight: bold;
+        }
+        .filter-print-summary {
+          margin-bottom: 20px;
+          padding: 10px;
+          border: 1px solid #ddd;
+          background-color: #f9f9f9;
+        }
+        .filter-print-summary h3 {
+          margin-top: 0;
+          margin-bottom: 10px;
+        }
+        .appointments-table {
+          page-break-inside: auto;
+        }
+        tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+        thead {
+          display: table-header-group;
+        }
+        tfoot {
+          display: table-footer-group;
+        }
+      }
+    `,
+    onBeforeGetContent: () => {
+      // Add a title to the print content if filtering is active
+      const printTitle = document.createElement('h2');
+      printTitle.className = 'print-title';
+      
+      let title = 'Healthcare Appointments';
+      if (selectedDoctor) title += ` - Doctor: ${selectedDoctor}`;
+      if (selectedPatient) title += ` - Patient: ${selectedPatient}`;
+      
+      printTitle.textContent = title;
+      
+      // Insert the title at the beginning of the print content
+      if (!appointmentsPrintRef.current.querySelector('.print-title')) {
+        appointmentsPrintRef.current.insertBefore(printTitle, appointmentsPrintRef.current.firstChild);
+      }
+    },
+    onAfterPrint: () => {
+      console.log("Print completed");
+      // Remove the title after printing
+      const printTitle = appointmentsPrintRef.current.querySelector('.print-title');
+      if (printTitle) {
+        appointmentsPrintRef.current.removeChild(printTitle);
+      }
+    }
   });
 
   // Print appointment details
@@ -443,7 +566,79 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
 
   return (
     <div className="appointments-list-container">
-      <div ref={appointmentsPrintRef} className="appointments-list">
+      {/* Add filtering options */}
+      <div className="appointments-filters">
+        <div className="filter-row">
+          <div className="filter-group">
+            <label htmlFor="doctor-filter">Filter by Doctor:</label>
+            <select
+              id="doctor-filter"
+              value={selectedDoctor}
+              onChange={handleDoctorChange}
+              className="filter-select"
+            >
+              <option value="">All Doctors</option>
+              {doctors.map(doctor => (
+                <option key={doctor} value={doctor}>{doctor}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label htmlFor="patient-filter">Filter by Patient:</label>
+            <select
+              id="patient-filter"
+              value={selectedPatient}
+              onChange={handlePatientChange}
+              className="filter-select"
+            >
+              <option value="">All Patients</option>
+              {patients.map(patient => (
+                <option key={patient} value={patient}>{patient}</option>
+              ))}
+            </select>
+          </div>
+          
+          <button className="reset-filters-btn" onClick={handleResetFilters}>
+            <i className="fas fa-undo"></i> Reset Filters
+          </button>
+        </div>
+        
+        <div className="filter-summary">
+          {selectedDoctor && (
+            <div className="active-filter">
+              <span>Doctor: <strong>{selectedDoctor}</strong></span>
+              <button onClick={() => setSelectedDoctor('')}><i className="fas fa-times"></i></button>
+            </div>
+          )}
+          
+          {selectedPatient && (
+            <div className="active-filter">
+              <span>Patient: <strong>{selectedPatient}</strong></span>
+              <button onClick={() => setSelectedPatient('')}><i className="fas fa-times"></i></button>
+            </div>
+          )}
+          
+          {filteredAppointments.length > 0 && (
+            <div className="results-count">
+              Showing <strong>{filteredAppointments.length}</strong> appointment{filteredAppointments.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div ref={appointmentsPrintRef} className="appointments-list print-container">
+        {/* Include filter summary in printable area */}
+        <div className="print-only filter-print-summary">
+          <h3>Filter Summary</h3>
+          {selectedDoctor && <p>Doctor: <strong>{selectedDoctor}</strong></p>}
+          {selectedPatient && <p>Patient: <strong>{selectedPatient}</strong></p>}
+          {filters.status && filters.status !== 'all' && <p>Status: <strong>{filters.status}</strong></p>}
+          {filters.date && <p>Date: <strong>{filters.date}</strong></p>}
+          <p>Total Appointments: <strong>{filteredAppointments.length}</strong></p>
+          <p>Generated on: <strong>{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</strong></p>
+        </div>
+        
         {loading ? (
           <div className="loading-container">
             <div className="loading-spinner">
@@ -461,7 +656,7 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
                 <th>Date & Time</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="no-print">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -535,7 +730,19 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
       {/* Action buttons */}
       <div className="appointments-actions">
         <button className="print-all-btn" onClick={handlePrint}>
-          <i className="fas fa-print"></i> Print All Appointments
+          <i className="fas fa-print"></i> 
+          {selectedDoctor ? `Print Appointments for Dr. ${selectedDoctor}` : 
+            selectedPatient ? `Print Appointments for Patient ${selectedPatient}` : 
+            `Print ${filteredAppointments.length} Appointment${filteredAppointments.length !== 1 ? 's' : ''}`}
+        </button>
+        
+        {/* Add a download as PDF option */}
+        <button 
+          className="export-pdf-btn" 
+          onClick={handlePrint}
+          title="Export as PDF (same as print, but save as PDF)"
+        >
+          <i className="fas fa-file-pdf"></i> Export as PDF
         </button>
       </div>
       

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import '../../../styles/pages/patient/BookAppointmentModal.css';
 import { doctorApi, appointmentApi, patientApi } from '../../../services/api';
+import PaymentModal from './PaymentModal';
 
 const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointment }) => {
-  const [step, setStep] = useState(1); // 1: Select doctor, 2: Choose date/time, 3: Enter medical details, 4: Confirm
+  const [step, setStep] = useState(1); // 1: Select doctor, 2: Choose date/time, 3: Enter medical details, 4: Confirm, 5: Payment
   const [formData, setFormData] = useState({
     doctorId: '',
     doctorName: '',
@@ -35,62 +36,72 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
   const [error, setError] = useState('');
   const [specializations, setSpecializations] = useState([]);
   const [patientInfo, setPatientInfo] = useState(null);
+  
+  // Payment related states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [tempAppointmentData, setTempAppointmentData] = useState(null);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
 
-  // Fetch doctors on component mount
   useEffect(() => {
+    const fetchSpecializations = async () => {
+      try {
+        const specs = await doctorApi.getSpecializations();
+        setSpecializations(specs);
+      } catch (error) {
+        console.error("Failed to fetch specializations:", error);
+      }
+    };
+
     const fetchDoctors = async () => {
       setIsLoading(true);
       try {
-        // Fetch doctors from API
-        const doctorsList = await doctorApi.getAllDoctors();
-        
-        // Only show active doctors
-        const activeDoctors = doctorsList.filter(doctor => doctor.status === 'ACTIVE');
-        setDoctors(activeDoctors);
-        setFilteredDoctors(activeDoctors);
-        
-        // Extract unique specializations for filter dropdown
-        const uniqueSpecializations = [...new Set(activeDoctors.map(doctor => doctor.specialization))];
-        setSpecializations(uniqueSpecializations);
-        
-        setIsLoading(false);
+        const allDoctors = await doctorApi.getAllDoctors();
+        setDoctors(allDoctors);
+        setFilteredDoctors(allDoctors);
       } catch (error) {
         console.error("Failed to fetch doctors:", error);
         setError("Failed to load doctors. Please try again.");
+      } finally {
         setIsLoading(false);
       }
     };
 
-    fetchDoctors();
-    
-    // Fetch patient info for pre-filling form fields
     const fetchPatientInfo = async () => {
+      if (!patientId) return;
+      
       try {
-        if (patientId) {
-          const patientData = await patientApi.getPatientById(patientId);
-          setPatientInfo(patientData);
-          
-          // Pre-fill form data with patient information
-          setFormData(prev => ({
-            ...prev,
+        const patientData = await patientApi.getPatientProfile(patientId);
+        setPatientInfo(patientData);
+        
+        // Pre-fill form data if available
+        if (patientData) {
+          setFormData(prevData => ({
+            ...prevData,
             age: patientData.age || '',
             gender: patientData.gender || '',
-            bloodGroup: patientData.bloodGroup || ''
+            bloodGroup: patientData.bloodGroup || '',
+            allergyHistory: patientData.allergies || '',
+            currentMedications: patientData.currentMedications || '',
+            pastMedicalHistory: patientData.medicalHistory || '',
+            height: patientData.height || '',
+            weight: patientData.weight || ''
           }));
         }
       } catch (error) {
-        console.error("Failed to fetch patient information:", error);
+        console.error("Failed to fetch patient info:", error);
       }
     };
-    
+
+    fetchSpecializations();
+    fetchDoctors();
     fetchPatientInfo();
   }, [patientId]);
 
-  // Filter doctors when specialization changes
   useEffect(() => {
     if (selectedSpecialization) {
-      const filtered = doctors.filter(
-        doctor => doctor.specialization === selectedSpecialization
+      const filtered = doctors.filter(doctor => 
+        doctor.specialization === selectedSpecialization
       );
       setFilteredDoctors(filtered);
     } else {
@@ -98,46 +109,36 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
     }
   }, [selectedSpecialization, doctors]);
 
-  // Generate available time slots for selected date
   useEffect(() => {
     if (formData.date && formData.doctorId) {
-      const fetchAvailableTimes = async () => {
-        try {
-          // In a real implementation, we would fetch available times from the API
-          // For now, we'll generate some default times and check against existing appointments
-          const baseTimeSlots = [
-            '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', 
-            '11:00 AM', '11:30 AM', '12:00 PM', '02:00 PM', 
-            '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
-          ];
-          
-          // Fetch the doctor's appointments for this date to check availability
-          const appointments = await appointmentApi.getAppointmentsByDoctorId(formData.doctorId);
-          const bookedTimes = appointments
-            .filter(app => app.appointmentDate === formData.date)
-            .map(app => app.appointmentTime);
-          
-          // Filter out booked times
-          const available = baseTimeSlots.filter(time => !bookedTimes.includes(time));
-          setAvailableTimes(available);
-        } catch (error) {
-          console.error("Failed to fetch available times:", error);
-          setError("Could not retrieve available appointment times.");
-        }
-      };
-      
-      fetchAvailableTimes();
+      fetchAvailableTimes(formData.doctorId, formData.date);
+    } else {
+      setAvailableTimes([]);
     }
   }, [formData.date, formData.doctorId]);
 
+  const fetchAvailableTimes = async (doctorId, date) => {
+    try {
+      const times = await doctorApi.getAvailableTimeSlots(doctorId, date);
+      setAvailableTimes(times);
+    } catch (error) {
+      console.error("Failed to fetch available times:", error);
+      setError("Failed to load available time slots. Please try again.");
+      setAvailableTimes([]);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
   };
 
   const handleDoctorSelect = (doctor) => {
-    setFormData(prev => ({
-      ...prev,
+    setFormData(prevState => ({
+      ...prevState,
       doctorId: doctor.id,
       doctorName: doctor.name,
       specialization: doctor.specialization
@@ -145,23 +146,11 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
     setStep(2);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsLoading(true);
-    setError('');
-
     try {
-        // Extract patient ID from localStorage to ensure it's current
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        const currentPatientId = userData.id || patientId;
-        
-        if (!currentPatientId) {
-            throw new Error('Patient ID not found. Please log in again.');
-        }
-        
-        // Format the appointment data
         const appointmentData = {
-            patientId: currentPatientId,
+            patientId: patientId,
             patientName: patientName,
             doctorId: formData.doctorId,
             doctorName: formData.doctorName,
@@ -171,42 +160,69 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             appointmentType: formData.type,
             problem: formData.problem,
             notes: formData.notes,
-            // Include patient medical details
             patientDetails: {
                 age: formData.age,
-                bloodGroup: formData.bloodGroup,
                 gender: formData.gender,
+                bloodGroup: formData.bloodGroup,
                 allergyHistory: formData.allergyHistory,
                 currentMedications: formData.currentMedications,
                 pastMedicalHistory: formData.pastMedicalHistory,
-                vitalSigns: {
-                    height: formData.height,
-                    weight: formData.weight,
-                    temperature: formData.temperature,
-                    bloodPressure: formData.bloodPressure,
-                    pulse: formData.pulse,
-                    oxygenSaturation: formData.oxygenSaturation
-                }
+                height: formData.height,
+                weight: formData.weight,
+                temperature: formData.temperature,
+                bloodPressure: formData.bloodPressure,
+                pulse: formData.pulse,
+                oxygenSaturation: formData.oxygenSaturation
             }
         };
 
-        console.log('Submitting appointment data:', appointmentData);
-
-        // Call the API to create the appointment
-        const response = await appointmentApi.createAppointment(appointmentData);
+        console.log('Appointment data prepared for payment:', appointmentData);
         
-        console.log('Appointment created successfully:', response);
-
-        // Pass to parent component to update UI
-        onAddAppointment(response);
+        // Store the appointment data temporarily
+        setTempAppointmentData(appointmentData);
         
-        // Display success message in step 4
-        setStep(4);
+        // Show the payment modal
+        setShowPaymentModal(true);
     } catch (error) {
-        console.error("Failed to create appointment:", error);
-        setError(error.message || "Failed to book appointment. Please try again.");
+        console.error("Failed to prepare for payment:", error);
+        setError(error.message || "Failed to process appointment. Please try again.");
     } finally {
         setIsLoading(false);
+    }
+  };
+  
+  // Handle payment completion
+  const handlePaymentComplete = async (payment) => {
+    try {
+      setPaymentDetails(payment);
+      setPaymentCompleted(true);
+      setShowPaymentModal(false);
+      
+      console.log('Payment completed:', payment);
+      console.log('Creating appointment with payment details');
+      
+      // Add payment information to the appointment data
+      const appointmentWithPayment = {
+        ...tempAppointmentData,
+        paymentId: payment.id,
+        paymentStatus: payment.status,
+        paymentAmount: payment.amount,
+        paymentMethod: payment.paymentMethod
+      };
+      
+      // Call the API to create the appointment
+      const response = await appointmentApi.createAppointment(appointmentWithPayment);
+      
+      console.log('Appointment created successfully:', response);
+      
+      // Pass to parent component to update UI
+      onAddAppointment(response);
+      
+      // Move to success step
+      setStep(5);
+    } catch (error) {
+      console.error("Failed to finalize appointment after payment:", error);
+      setError(error.message || "Payment was processed but we couldn't complete your booking. Please contact support.");
     }
   };
 
@@ -235,42 +251,44 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
 
       <div className="doctors-grid">
         {isLoading ? (
-          <div className="loading">Loading doctors...</div>
-        ) : filteredDoctors.length === 0 ? (
-          <div className="no-doctors">
-            <p>No doctors available for the selected specialization.</p>
+          <div className="loading">
+            <i className="fas fa-spinner fa-spin"></i> Loading doctors...
           </div>
-        ) : (
+        ) : filteredDoctors.length > 0 ? (
           filteredDoctors.map(doctor => (
-            <div 
-              key={doctor.id} 
-              className="doctor-card"
-              onClick={() => handleDoctorSelect(doctor)}
-            >
+            <div key={doctor.id} className="doctor-card" onClick={() => handleDoctorSelect(doctor)}>
               <div className="doctor-avatar">
-                <img 
-                  src={doctor.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=random`} 
-                  alt={doctor.name} 
-                />
+                {doctor.profileImage ? (
+                  <img src={doctor.profileImage} alt={doctor.name} />
+                ) : (
+                  <div className="avatar-placeholder">
+                    {doctor.name.charAt(0)}
+                  </div>
+                )}
               </div>
               <div className="doctor-info">
                 <h3>{doctor.name}</h3>
-                <p className="doctor-specialization">{doctor.specialization}</p>
-                <p className="doctor-experience">{doctor.experience || '5+'} years experience</p>
-                <div className="doctor-rating">
-                  <span className="stars">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <i 
-                        key={star}
-                        className={`fas fa-star ${star <= (doctor.rating || 4) ? 'filled' : ''}`}
-                      ></i>
-                    ))}
-                  </span>
-                  <span className="rating-count">{doctor.reviewCount || '120'} reviews</span>
+                <p className="doctor-spec">{doctor.specialization}</p>
+                <p className="doctor-exp">{doctor.experience} years experience</p>
+              </div>
+              <div className="doctor-rating">
+                <div className="stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <i 
+                      key={star} 
+                      className={`fas fa-star ${star <= doctor.rating ? 'filled' : ''}`}
+                    ></i>
+                  ))}
                 </div>
+                <span className="rating-count">{doctor.reviewCount || 0} reviews</span>
               </div>
             </div>
           ))
+        ) : (
+          <div className="no-doctors">
+            <i className="fas fa-user-md"></i>
+            <p>No doctors found for the selected specialization.</p>
+          </div>
         )}
       </div>
     </>
@@ -400,7 +418,35 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             <option value="Prefer not to say">Prefer not to say</option>
           </select>
         </div>
+      </div>
 
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="height">Height (cm)</label>
+          <input 
+            type="number" 
+            id="height" 
+            name="height"
+            value={formData.height}
+            onChange={handleChange}
+            placeholder="Centimeters"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="weight">Weight (kg)</label>
+          <input 
+            type="number" 
+            id="weight" 
+            name="weight"
+            value={formData.weight}
+            onChange={handleChange}
+            placeholder="Kilograms"
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
         <div className="form-group">
           <label htmlFor="bloodGroup">Blood Group</label>
           <select 
@@ -408,7 +454,6 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             name="bloodGroup"
             value={formData.bloodGroup}
             onChange={handleChange}
-            required
           >
             <option value="">Select blood group</option>
             <option value="A+">A+</option>
@@ -422,35 +467,7 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             <option value="Unknown">Unknown</option>
           </select>
         </div>
-      </div>
 
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="height">Height (cm)</label>
-          <input 
-            type="number" 
-            id="height" 
-            name="height"
-            value={formData.height}
-            onChange={handleChange}
-            placeholder="In centimeters"
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="weight">Weight (kg)</label>
-          <input 
-            type="number" 
-            id="weight" 
-            name="weight"
-            value={formData.weight}
-            onChange={handleChange}
-            placeholder="In kilograms"
-          />
-        </div>
-      </div>
-
-      <div className="form-row">
         <div className="form-group">
           <label htmlFor="temperature">Temperature (°F)</label>
           <input 
@@ -462,7 +479,9 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             placeholder="98.6°F"
           />
         </div>
+      </div>
 
+      <div className="form-row">
         <div className="form-group">
           <label htmlFor="bloodPressure">Blood Pressure (mm Hg)</label>
           <input 
@@ -474,31 +493,31 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             placeholder="120/80"
           />
         </div>
-      </div>
 
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="pulse">Pulse (bpm)</label>
-          <input 
-            type="text" 
-            id="pulse" 
-            name="pulse"
-            value={formData.pulse}
-            onChange={handleChange}
-            placeholder="72 bpm"
-          />
-        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="pulse">Pulse (bpm)</label>
+            <input 
+              type="text" 
+              id="pulse" 
+              name="pulse"
+              value={formData.pulse}
+              onChange={handleChange}
+              placeholder="72 bpm"
+            />
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="oxygenSaturation">Oxygen Saturation (%)</label>
-          <input 
-            type="text" 
-            id="oxygenSaturation" 
-            name="oxygenSaturation"
-            value={formData.oxygenSaturation}
-            onChange={handleChange}
-            placeholder="98%"
-          />
+          <div className="form-group">
+            <label htmlFor="oxygenSaturation">Oxygen Saturation (%)</label>
+            <input 
+              type="text" 
+              id="oxygenSaturation" 
+              name="oxygenSaturation"
+              value={formData.oxygenSaturation}
+              onChange={handleChange}
+              placeholder="98%"
+            />
+          </div>
         </div>
       </div>
 
@@ -581,7 +600,7 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             <span className="detail-value">{formData.problem}</span>
           </div>
         </div>
-
+        
         <div className="confirmation-section">
           <h4>Patient Information</h4>
           <div className="detail-item">
@@ -592,41 +611,52 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             <span className="detail-label">Gender:</span>
             <span className="detail-value">{formData.gender}</span>
           </div>
-          <div className="detail-item">
-            <span className="detail-label">Blood Group:</span>
-            <span className="detail-value">{formData.bloodGroup}</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Height/Weight:</span>
-            <span className="detail-value">{formData.height ? formData.height + ' cm' : '-'} / {formData.weight ? formData.weight + ' kg' : '-'}</span>
-          </div>
-          {formData.allergyHistory && (
+          {formData.bloodGroup && (
             <div className="detail-item">
-              <span className="detail-label">Allergies:</span>
-              <span className="detail-value">{formData.allergyHistory}</span>
+              <span className="detail-label">Blood Group:</span>
+              <span className="detail-value">{formData.bloodGroup}</span>
             </div>
           )}
-          {formData.currentMedications && (
+          {formData.height && formData.weight && (
             <div className="detail-item">
-              <span className="detail-label">Current Medications:</span>
-              <span className="detail-value">{formData.currentMedications}</span>
+              <span className="detail-label">Height/Weight:</span>
+              <span className="detail-value">{formData.height} cm / {formData.weight} kg</span>
             </div>
           )}
         </div>
+        
+        {(formData.allergyHistory || formData.currentMedications || formData.pastMedicalHistory) && (
+          <div className="confirmation-section">
+            <h4>Medical History</h4>
+            {formData.allergyHistory && (
+              <div className="detail-item">
+                <span className="detail-label">Allergies:</span>
+                <span className="detail-value">{formData.allergyHistory}</span>
+              </div>
+            )}
+            {formData.currentMedications && (
+              <div className="detail-item">
+                <span className="detail-label">Current Medications:</span>
+                <span className="detail-value">{formData.currentMedications}</span>
+              </div>
+            )}
+            {formData.pastMedicalHistory && (
+              <div className="detail-item">
+                <span className="detail-label">Medical History:</span>
+                <span className="detail-value">{formData.pastMedicalHistory}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {formData.notes && (
+          <div className="notes-section">
+            <label>Additional Notes:</label>
+            <p>{formData.notes}</p>
+          </div>
+        )}
       </div>
-
-      <div className="notes-section">
-        <label htmlFor="notes">Additional Notes (Optional)</label>
-        <textarea 
-          id="notes" 
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          rows="2"
-          placeholder="Any additional information you'd like to provide"
-        ></textarea>
-      </div>
-
+      
       <div className="consent-section">
         <label className="consent-checkbox">
           <input type="checkbox" required />
@@ -639,7 +669,7 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
           <i className="fas fa-arrow-left"></i> Back
         </button>
         <button type="button" className="submit-btn" onClick={handleSubmit}>
-          <i className="fas fa-check-circle"></i> Confirm Booking
+          <i className="fas fa-credit-card"></i> Proceed to Payment
         </button>
       </div>
     </div>
@@ -653,8 +683,23 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
       <h3>Appointment Scheduled Successfully!</h3>
       <p>Your appointment with {formData.doctorName} has been booked for {formData.date} at {formData.time}.</p>
       <p>You will receive a confirmation notification, and the appointment details will appear in your dashboard.</p>
+      {paymentDetails && (
+        <div className="payment-summary">
+          <p className="payment-confirmation">
+            <i className="fas fa-receipt"></i> Payment of ${paymentDetails.amount}.00 was processed successfully.
+          </p>
+          <p className="payment-method">
+            Payment Method: {paymentDetails.paymentMethod === 'CARD' ? 
+              `Card ending in ${paymentDetails.cardDetails?.lastFourDigits}` : 
+              `Insurance (${paymentDetails.insurance?.provider})`}
+          </p>
+          <p className="transaction-id">
+            Transaction ID: {paymentDetails.transactionId}
+          </p>
+        </div>
+      )}
       <button type="button" className="close-success-btn" onClick={onClose}>
-        Close
+        <i className="fas fa-arrow-right"></i> Go to Dashboard
       </button>
     </div>
   );
@@ -686,6 +731,10 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
             <div className="step-number">4</div>
             <span className="step-label">Confirm</span>
           </div>
+          <div className={`step ${step >= 5 ? 'active' : ''}`}>
+            <div className="step-number">5</div>
+            <span className="step-label">Complete</span>
+          </div>
         </div>
 
         {error && (
@@ -712,6 +761,19 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
           )}
         </div>
       </div>
+      
+      {/* Payment Modal */}
+      <PaymentModal 
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        appointmentData={tempAppointmentData}
+        doctorDetails={{
+          id: formData.doctorId,
+          name: formData.doctorName,
+          specialization: formData.specialization
+        }}
+        onPaymentComplete={handlePaymentComplete}
+      />
     </div>
   );
 };

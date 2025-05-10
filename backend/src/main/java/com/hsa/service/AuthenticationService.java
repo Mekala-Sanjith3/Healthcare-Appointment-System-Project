@@ -20,6 +20,7 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final CaptchaService captchaService;
 
     public LoginResponse registerDoctor(DoctorRegistrationRequest request) {
         var doctor = new Doctor(
@@ -66,6 +67,11 @@ public class AuthenticationService {
     }
 
     public LoginResponse login(LoginRequest request) {
+        // Validate captcha token first
+        if (request.getCaptchaToken() == null || !captchaService.validateCaptcha(request.getCaptchaToken())) {
+            throw new IllegalArgumentException("Invalid CAPTCHA. Please try again.");
+        }
+        
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
