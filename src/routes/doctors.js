@@ -7,12 +7,68 @@ const auth = require('../middleware/auth');
 // Get all doctors
 router.get('/', async (req, res) => {
   try {
-    // Query to get doctors with limited sensitive information
-    const [doctors] = await db.query(
-      'SELECT id, first_name, last_name, email, specialty, phone_number, profile_picture, availability, created_at, updated_at FROM doctors'
-    );
+    const { 
+      specialty, 
+      name, 
+      location, 
+      availableDate, 
+      limit = 10, 
+      page = 1 
+    } = req.query;
     
-    res.status(200).json(doctors);
+    // Start building the query
+    let query = 'SELECT id, first_name, last_name, email, specialty, phone_number, profile_picture, availability, created_at, updated_at FROM doctors WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) as total FROM doctors WHERE 1=1';
+    const queryParams = [];
+    
+    // Add filters if provided
+    if (specialty) {
+      query += ' AND specialty LIKE ?';
+      countQuery += ' AND specialty LIKE ?';
+      queryParams.push(`%${specialty}%`);
+    }
+    
+    if (name) {
+      query += ' AND (first_name LIKE ? OR last_name LIKE ?)';
+      countQuery += ' AND (first_name LIKE ? OR last_name LIKE ?)';
+      queryParams.push(`%${name}%`, `%${name}%`);
+    }
+    
+    if (location) {
+      query += ' AND location LIKE ?';
+      countQuery += ' AND location LIKE ?';
+      queryParams.push(`%${location}%`);
+    }
+    
+    if (availableDate) {
+      // Assuming availability is stored as a JSON or string we can search
+      // Modify this based on your actual availability data structure
+      query += ' AND availability LIKE ?';
+      countQuery += ' AND availability LIKE ?';
+      queryParams.push(`%${availableDate}%`);
+    }
+    
+    // Add pagination
+    const offset = (page - 1) * limit;
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    queryParams.push(parseInt(limit), parseInt(offset));
+    
+    // Execute the queries
+    const [doctors] = await db.query(query, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams.slice(0, -2)); // Remove limit and offset params
+    
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+    
+    res.status(200).json({
+      data: doctors,
+      meta: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages
+      }
+    });
   } catch (error) {
     console.error('Error fetching doctors:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

@@ -1,0 +1,487 @@
+/* Medical Records Component Styles */
+
+/* Print styles for medical records */
+@media print {
+  .medical-record-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  .dashboard-sidebar,
+  .dashboard-header,
+  .tabs-list,
+  .search-box,
+  .record-footer,
+  .retry-button {
+    display: none !important;
+  }
+  
+  .dashboard-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  
+  .medical-records-container {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .record-header {
+    background-color: #ffffff !important;
+    padding: 10px !important;
+  }
+  
+  body {
+    background-color: white !important;
+  }
+}
+
+/* Custom scrollbar for the medical records list */
+.medical-records-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.medical-records-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.medical-records-list::-webkit-scrollbar-thumb {
+  background: #c4c9d4;
+  border-radius: 4px;
+}
+
+.medical-records-list::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Enhanced styling for medical record fields */
+.record-field {
+  position: relative;
+}
+
+.record-field:after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 30px;
+  bottom: 0;
+  width: 1px;
+  background-color: #e2e8f0;
+  z-index: 0;
+}
+
+.record-field:last-child:after {
+  display: none;
+}
+
+/* Download button for individual records */
+.download-record-btn {
+  background-color: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.download-record-btn:hover {
+  background-color: #2c5282;
+}
+
+.download-record-btn i {
+  margin-right: 6px;
+}
+
+/* Share button for medical records */
+.share-record-btn {
+  background-color: #38a169;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.share-record-btn:hover {
+  background-color: #2f855a;
+}
+
+.share-record-btn i {
+  margin-right: 6px;
+}
+
+/* Record actions menu */
+.record-actions-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+}
+
+.record-actions-menu .menu-toggle {
+  background: none;
+  border: none;
+  color: #718096;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.record-actions-menu .menu-toggle:hover {
+  color: #4a5568;
+}
+
+.record-actions-menu .menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px 0;
+  min-width: 160px;
+  z-index: 20;
+}
+
+.record-actions-menu .menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  color: #4a5568;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.record-actions-menu .menu-item:hover {
+  background-color: #f7fafc;
+}
+
+.record-actions-menu .menu-item i {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
+}
+
+/* Severity indicators for medical records */
+.severity-indicator {
+  display: inline-block;
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.severity-low {
+  background-color: #48bb78;
+}
+
+.severity-medium {
+  background-color: #ed8936;
+}
+
+.severity-high {
+  background-color: #e53e3e;
+}
+
+/* Filter tabs for medical records */
+.record-filter-tabs {
+  display: flex;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin-top: 16px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.record-filter-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-tab {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #718096;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.filter-tab.active {
+  color: #4299e1;
+  border-bottom-color: #4299e1;
+  font-weight: 500;
+}
+
+.filter-tab:hover:not(.active) {
+  color: #4a5568;
+  border-bottom-color: #e2e8f0;
+}
+
+/* Record type pill styles */
+.record-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.record-type-lab {
+  background-color: #e6fffa;
+  color: #319795;
+}
+
+.record-type-prescription {
+  background-color: #ebf8ff;
+  color: #3182ce;
+}
+
+.record-type-consultation {
+  background-color: #faf5ff;
+  color: #805ad5;
+}
+
+.record-type-vaccination {
+  background-color: #f0fff4;
+  color: #38a169;
+}
+
+.record-type-surgery {
+  background-color: #fff5f5;
+  color: #e53e3e;
+}
+
+.record-type-imaging {
+  background-color: #fffaf0;
+  color: #dd6b20;
+}
+
+/* Additional custom styling for medical record cards */
+.medical-record-card {
+  position: relative;
+  max-width: 100%;
+}
+
+/* File attachments section */
+.record-attachments {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background-color: #f7fafc;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.attachment-item i {
+  margin-right: 8px;
+  color: #4299e1;
+}
+
+.attachment-name {
+  font-size: 0.85rem;
+  color: #4a5568;
+  flex-grow: 1;
+}
+
+.attachment-download {
+  color: #4299e1;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Group medical records by date */
+.records-date-group {
+  margin-bottom: 24px;
+}
+
+.records-date-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 12px;
+  padding-left: 8px;
+  border-left: 3px solid #4299e1;
+}
+
+/* Health timeline for medical history */
+.health-timeline {
+  position: relative;
+  padding-left: 32px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 2px;
+  background-color: #e2e8f0;
+}
+
+.timeline-event {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -32px;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #4299e1;
+  border: 3px solid white;
+  z-index: 1;
+}
+
+.timeline-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+}
+
+.timeline-date {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.timeline-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.timeline-description {
+  font-size: 0.9rem;
+  color: #4a5568;
+  line-height: 1.5;
+}
+
+/* Doctor photo or avatar */
+.doctor-avatar-container {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 12px;
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  color: #4a5568;
+  font-size: 1.2rem;
+}
+
+/* Header controls with search and view toggle */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.view-toggle {
+  display: flex;
+  background-color: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.view-btn {
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.view-btn.active {
+  background-color: white;
+  color: #3182ce;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.view-btn:hover:not(.active) {
+  color: #334155;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Adjust medical-records-header for the new layout */
+.medical-records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eaedf3;
+  background-color: #f9fafc;
+}
+
+/* Timeline specific styling */
+.timeline-dot.lab-result {
+  background-color: #38a169;
+}
+
+.timeline-dot.prescription {
+  background-color: #3182ce;
+}
+
+.timeline-dot.consultation {
+  background-color: #805ad5;
+}
+
+.timeline-content.lab-result {
+  border-left: 4px solid #38a169;
+}
+
+.timeline-content.prescription {
+  border-left: 4px solid #3182ce;
+}
+
+.timeline-content.consultation {
+  border-left: 4px solid #805ad5;
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.doctor-name-small {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: normal;
+} 

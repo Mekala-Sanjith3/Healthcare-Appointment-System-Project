@@ -6,9 +6,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../common/Tabs/tabs
 import "../../../styles/pages/doctor/DoctorDashboard.css";
 import "../../../styles/pages/doctor/PatientHistory.css";
 import { Calendar, Clock, Users, FileText, Bell, Settings, LogOut, Brain, History, Star } from "lucide-react";
-import { doctorApi, appointmentApi } from "../../../services/api";
+import { doctorApi, appointmentApi, medicalRecordsApi } from "../../../services/api";
 import PatientHistory from "./PatientHistory";
 import DoctorReviews from "./DoctorReviews";
+import AddMedicalRecordModal from './AddMedicalRecordModal';
+import PatientDetailsModal from './PatientDetailsModal';
 
 const DoctorDashboard = () => {
   const [activeTab, setActiveTab] = useState("appointments");
@@ -60,6 +62,14 @@ const DoctorDashboard = () => {
   // For appointment details modal
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showAppointmentDetailsModal, setShowAppointmentDetailsModal] = useState(false);
+
+  // Add these state variables
+  const [showAddMedicalRecordModal, setShowAddMedicalRecordModal] = useState(false);
+  const [selectedPatientForRecord, setSelectedPatientForRecord] = useState(null);
+
+  // Add this state variable
+  const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
+  const [selectedAppointmentForDetails, setSelectedAppointmentForDetails] = useState(null);
 
   const navigate = useNavigate();
 
@@ -113,16 +123,39 @@ const DoctorDashboard = () => {
         
         if (doctorAppointments && doctorAppointments.length > 0) {
           console.log("Fetched doctor appointments:", doctorAppointments);
-          setAppointments(doctorAppointments);
+          
+          // Deduplicate appointments by ID
+          const uniqueAppointmentsMap = new Map();
+          doctorAppointments.forEach(appointment => {
+            uniqueAppointmentsMap.set(appointment.id, appointment);
+          });
+          
+          const uniqueAppointments = Array.from(uniqueAppointmentsMap.values());
+          console.log(`Deduplicated ${doctorAppointments.length} appointments to ${uniqueAppointments.length}`);
+          
+          setAppointments(uniqueAppointments);
+          
+          // Store deduplicated appointments in localStorage to help with patient details modal
+          localStorage.setItem('doctorAppointments', JSON.stringify(uniqueAppointments));
         } else {
           console.log("No appointments found for doctor ID:", doctor.id);
           // For demo purposes, check mock appointments directly if none found
           const allMockAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-          const doctorMockAppointments = allMockAppointments.filter(app => app.doctorId === doctor.id);
           
-          if (doctorMockAppointments.length > 0) {
-            console.log("Found mock appointments for doctor:", doctorMockAppointments);
-            setAppointments(doctorMockAppointments);
+          // Filter and deduplicate mock appointments
+          const uniqueMockAppointmentsMap = new Map();
+          allMockAppointments.forEach(app => {
+            if (app.doctorId === doctor.id) {
+              uniqueMockAppointmentsMap.set(app.id, app);
+            }
+          });
+          
+          const uniqueMockAppointments = Array.from(uniqueMockAppointmentsMap.values());
+          
+          if (uniqueMockAppointments.length > 0) {
+            console.log("Found mock appointments for doctor:", uniqueMockAppointments);
+            setAppointments(uniqueMockAppointments);
+            localStorage.setItem('doctorAppointments', JSON.stringify(uniqueMockAppointments));
           }
         }
       } catch (err) {
@@ -131,10 +164,21 @@ const DoctorDashboard = () => {
         
         // Fallback to mock data if API call fails
         const allMockAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-        const doctorMockAppointments = allMockAppointments.filter(app => app.doctorId === doctor.id);
-        if (doctorMockAppointments.length > 0) {
-          console.log("Using mock appointments as fallback:", doctorMockAppointments);
-          setAppointments(doctorMockAppointments);
+        
+        // Filter and deduplicate mock appointments
+        const uniqueMockAppointmentsMap = new Map();
+        allMockAppointments.forEach(app => {
+          if (app.doctorId === doctor.id) {
+            uniqueMockAppointmentsMap.set(app.id, app);
+          }
+        });
+        
+        const uniqueMockAppointments = Array.from(uniqueMockAppointmentsMap.values());
+        
+        if (uniqueMockAppointments.length > 0) {
+          console.log("Using mock appointments as fallback:", uniqueMockAppointments);
+          setAppointments(uniqueMockAppointments);
+          localStorage.setItem('doctorAppointments', JSON.stringify(uniqueMockAppointments));
         }
       } finally {
         setIsLoading(prev => ({ ...prev, appointments: false }));
@@ -298,10 +342,8 @@ const DoctorDashboard = () => {
 
   const handleViewAppointmentDetails = (appointmentId) => {
     const appointment = appointments.find(app => app.id === appointmentId);
-    if (appointment) {
-      setSelectedAppointment(appointment);
-      setShowAppointmentDetailsModal(true);
-    }
+    setSelectedAppointment(appointment);
+    setShowAppointmentDetailsModal(true);
   };
 
   const closeAppointmentDetailsModal = () => {
@@ -317,14 +359,10 @@ const DoctorDashboard = () => {
     navigate('/');
   };
 
-  const handleViewPatientDetails = (patientId) => {
-    // Find the patient
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      // In a real app, you'd show a modal or navigate to patient details
-      console.log("View patient details:", patient);
-      alert(`View details for patient: ${patient.name}`);
-    }
+  const handleViewPatientDetails = (appointmentId) => {
+    console.log("Opening patient details for appointment:", appointmentId);
+    setSelectedAppointmentForDetails(appointmentId);
+    setShowPatientDetailsModal(true);
   };
 
   const handleViewPatientHistory = (patientId) => {
@@ -389,6 +427,7 @@ const DoctorDashboard = () => {
           ...reportFormData,
           doctorId: doctor.id,
           doctorName: doctor.name,
+          specialty: doctor.specialization
         };
         
         // Submit to API
@@ -396,6 +435,27 @@ const DoctorDashboard = () => {
         
         // Update local state
         setReports(prev => [...prev, result]);
+        
+        // Create a medical record entry for the patient to see in their dashboard
+        const medicalRecordData = {
+          patient_id: reportFormData.patientId,
+          doctor_id: doctor.id,
+          doctor_name: doctor.name,
+          specialty: doctor.specialization,
+          diagnosis: `${reportFormData.reportType.charAt(0).toUpperCase() + reportFormData.reportType.slice(1)} Report`,
+          description: reportFormData.reportContent,
+          prescription: "",
+          treatment_plan: "",
+          notes: `Report generated on ${reportFormData.reportDate}`,
+          date: reportFormData.reportDate
+        };
+        
+        try {
+          await medicalRecordsApi.addMedicalRecord(medicalRecordData);
+          console.log("Medical record created for patient:", reportFormData.patientId);
+        } catch (recordError) {
+          console.error("Failed to create medical record:", recordError);
+        }
       }
       
       // Close modal
@@ -455,6 +515,27 @@ const DoctorDashboard = () => {
       });
       setShowNewReportModal(true);
     }
+  };
+
+  // Add this function to handle creating a medical record for a patient
+  const handleAddMedicalRecord = (appointment) => {
+    setSelectedPatientForRecord(appointment);
+    setShowAddMedicalRecordModal(true);
+  };
+
+  // Add this function to handle when a medical record is successfully added
+  const handleMedicalRecordAdded = (record) => {
+    // You can update any state as needed
+    console.log('Medical record added:', record);
+    
+    // Update appointment status to completed
+    const appointmentId = selectedPatientForRecord.id;
+    handleUpdateAppointmentStatus(appointmentId, 'COMPLETED');
+  };
+
+  const closePatientDetailsModal = () => {
+    setShowPatientDetailsModal(false);
+    setSelectedAppointmentForDetails(null);
   };
 
   const renderContent = () => {
@@ -566,6 +647,25 @@ const DoctorDashboard = () => {
                                   </button>
                                 </>
                               )}
+                              
+                              {(appointment.status === 'CONFIRMED' || appointment.status === 'COMPLETED') && (
+                                <>
+                                  <button 
+                                    className="record-btn"
+                                    onClick={() => handleAddMedicalRecord(appointment)}
+                                  >
+                                    <i className="fas fa-file-medical"></i>
+                                    Record
+                                  </button>
+                                  <button 
+                                    className="patient-details-btn"
+                                    onClick={() => handleViewPatientDetails(appointment.id)}
+                                  >
+                                    <i className="fas fa-user-md"></i>
+                                    Patient Details
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -638,6 +738,25 @@ const DoctorDashboard = () => {
                                       onClick={() => handleUpdateAppointmentStatus(appointment.id, 'CANCELLED')}
                                     >
                                       Cancel
+                                    </button>
+                                  </>
+                                )}
+                                
+                                {(appointment.status === 'CONFIRMED' || appointment.status === 'COMPLETED') && (
+                                  <>
+                                    <button 
+                                      className="record-btn"
+                                      onClick={() => handleAddMedicalRecord(appointment)}
+                                    >
+                                      <i className="fas fa-file-medical"></i>
+                                      Record
+                                    </button>
+                                    <button 
+                                      className="patient-details-btn"
+                                      onClick={() => handleViewPatientDetails(appointment.id)}
+                                    >
+                                      <i className="fas fa-user-md"></i>
+                                      Patient Details
                                     </button>
                                   </>
                                 )}
@@ -1261,8 +1380,38 @@ const DoctorDashboard = () => {
                 </button>
               </div>
             )}
+            {/* Add a button to view detailed patient info */}
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button 
+                className="view-patient-btn"
+                onClick={() => {
+                  handleViewPatientDetails(selectedAppointment.id);
+                  closeAppointmentDetailsModal();
+                }}
+              >
+                <i className="fas fa-user-md"></i> View Patient Medical Details
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {showAddMedicalRecordModal && selectedPatientForRecord && (
+        <AddMedicalRecordModal
+          isOpen={showAddMedicalRecordModal}
+          onClose={() => setShowAddMedicalRecordModal(false)}
+          appointment={selectedPatientForRecord}
+          onRecordAdded={handleMedicalRecordAdded}
+        />
+      )}
+
+      {/* Add the patient details modal component */}
+      {showPatientDetailsModal && (
+        <PatientDetailsModal
+          isOpen={showPatientDetailsModal}
+          onClose={closePatientDetailsModal}
+          appointmentId={selectedAppointmentForDetails}
+        />
       )}
     </div>
   );

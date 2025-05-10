@@ -3,6 +3,14 @@ const router = express.Router();
 const db = require('../db');
 const auth = require('../middleware/auth');
 
+// Log database connection details
+console.log('Appointments routes loaded with database config:', {
+  host: process.env.DB_HOST || db.config?.host || 'unknown',
+  user: process.env.DB_USER || db.config?.user || 'unknown',
+  database: process.env.DB_NAME || db.config?.database || 'unknown',
+  // Don't log password for security reasons
+});
+
 // Get all appointments (admin only)
 router.get('/', auth(['admin']), async (req, res) => {
   try {
@@ -108,6 +116,8 @@ router.post('/', auth(['admin', 'patient']), async (req, res) => {
   try {
     const { patient_id, doctor_id, date, time, type, status, notes } = req.body;
     
+    console.log('Received appointment creation request:', req.body);
+    
     // Patients can only create appointments for themselves
     if (req.user.role === 'patient' && req.user.id !== parseInt(patient_id)) {
       return res.status(403).json({ message: 'You can only create appointments for yourself' });
@@ -115,22 +125,48 @@ router.post('/', auth(['admin', 'patient']), async (req, res) => {
     
     // Validate required fields
     if (!patient_id || !doctor_id || !date || !time || !type) {
+      console.error('Missing required fields:', { patient_id, doctor_id, date, time, type });
       return res.status(400).json({ message: 'Missing required appointment fields' });
+    }
+    
+    // Validate appointment type matches the ENUM in the database
+    if (type !== 'IN_PERSON' && type !== 'TELEMEDICINE') {
+      console.error('Invalid appointment type:', type);
+      return res.status(400).json({ message: 'Invalid appointment type. Must be either IN_PERSON or TELEMEDICINE' });
     }
     
     // Check for conflicts
     const conflictQuery = `
       SELECT * FROM appointments
-      WHERE doctor_id = ? AND date = ? AND time = ? AND status != 'cancelled'
+      WHERE doctor_id = ? AND appointment_date = ? AND appointment_time = ? AND status != 'CANCELLED'
     `;
     const [conflicts] = await db.query(conflictQuery, [doctor_id, date, time]);
     
     if (conflicts.length > 0) {
+      console.error('Time slot conflict detected');
       return res.status(409).json({ message: 'This time slot is already booked' });
     }
     
+    // Get patient and doctor info for notifications
+    const [patientRows] = await db.query('SELECT name FROM patients WHERE id = ?', [patient_id]);
+    const [doctorRows] = await db.query('SELECT name FROM doctors WHERE id = ?', [doctor_id]);
+    
+    if (patientRows.length === 0 || doctorRows.length === 0) {
+      console.error('Patient or doctor not found:', { patient_id, doctor_id });
+      return res.status(404).json({ message: 'Patient or doctor not found' });
+    }
+
+    const patientName = patientRows[0].name;
+    const doctorName = doctorRows[0].name;
+    
+    console.log('Creating appointment between patient:', patientName, 'and doctor:', doctorName);
+    
+    // Start a transaction to ensure data consistency
+    await db.query('START TRANSACTION');
+    
+    // Insert the appointment
     const insertQuery = `
-      INSERT INTO appointments (patient_id, doctor_id, date, time, type, status, notes, created_at)
+      INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, notes, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
     `;
     
@@ -140,17 +176,78 @@ router.post('/', auth(['admin', 'patient']), async (req, res) => {
       date, 
       time, 
       type, 
-      status || 'pending', 
+      status || 'PENDING', 
       notes || ''
     ]);
     
+    const appointmentId = result.insertId;
+    console.log('Appointment created with ID:', appointmentId);
+    
+    // Create notification for the doctor
+    const doctorNotificationQuery = `
+      INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `;
+    
+    await db.query(doctorNotificationQuery, [
+      doctor_id,
+      'New Appointment',
+      `${patientName} has scheduled an appointment with you on ${date} at ${time}.`,
+      'APPOINTMENT',
+      appointmentId
+    ]);
+    
+    // Create notification for the patient
+    const patientNotificationQuery = `
+      INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `;
+    
+    await db.query(patientNotificationQuery, [
+      patient_id,
+      'Appointment Scheduled',
+      `Your appointment with ${doctorName} has been scheduled for ${date} at ${time}.`,
+      'APPOINTMENT',
+      appointmentId
+    ]);
+    
+    // Commit the transaction
+    await db.query('COMMIT');
+    
+    console.log('Appointment and notifications created successfully');
+    
     res.status(201).json({ 
-      id: result.insertId,
-      message: 'Appointment created successfully' 
+      id: appointmentId,
+      message: 'Appointment created successfully',
+      appointmentDetails: {
+        patientId: patient_id,
+        doctorId: doctor_id,
+        date: date,
+        time: time,
+        type: type,
+        status: status || 'PENDING',
+        notes: notes || ''
+      }
     });
   } catch (err) {
+    // Rollback in case of error
+    await db.query('ROLLBACK');
     console.error('Error creating appointment:', err);
-    res.status(500).json({ message: 'Server error' });
+    
+    let errorMessage = 'Server error';
+    
+    // Provide more specific error messages based on the error type
+    if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+      errorMessage = 'Invalid patient or doctor ID. Please check that both exist in the system.';
+    } else if (err.code === 'ER_DATA_TOO_LONG') {
+      errorMessage = 'One of the fields is too long.';
+    } else if (err.code === 'ER_BAD_FIELD_ERROR') {
+      errorMessage = 'Invalid field name in the request.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    res.status(500).json({ message: errorMessage });
   }
 });
 
@@ -162,7 +259,10 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
     
     // Get current appointment data
     const [currentAppointment] = await db.query(
-      'SELECT * FROM appointments WHERE id = ?', 
+      'SELECT a.*, p.name AS patient_name, d.name AS doctor_name FROM appointments a ' +
+      'JOIN patients p ON a.patient_id = p.id ' +
+      'JOIN doctors d ON a.doctor_id = d.id ' +
+      'WHERE a.id = ?', 
       [appointmentId]
     );
     
@@ -170,15 +270,17 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
       return res.status(404).json({ message: 'Appointment not found' });
     }
     
+    const appointment = currentAppointment[0];
+    
     // Doctors can only update their own appointments
-    if (req.user.role === 'doctor' && req.user.id !== currentAppointment[0].doctor_id) {
+    if (req.user.role === 'doctor' && req.user.id !== appointment.doctor_id) {
       return res.status(403).json({ message: 'Unauthorized to update this appointment' });
     }
     
     // Check for conflicts if changing date/time
-    if ((date && date !== currentAppointment[0].date) || 
-        (time && time !== currentAppointment[0].time) ||
-        (doctor_id && doctor_id !== currentAppointment[0].doctor_id)) {
+    if ((date && date !== appointment.date) || 
+        (time && time !== appointment.time) ||
+        (doctor_id && doctor_id !== appointment.doctor_id)) {
       
       const conflictQuery = `
         SELECT * FROM appointments
@@ -186,9 +288,9 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
       `;
       
       const [conflicts] = await db.query(conflictQuery, [
-        doctor_id || currentAppointment[0].doctor_id,
-        date || currentAppointment[0].date,
-        time || currentAppointment[0].time,
+        doctor_id || appointment.doctor_id,
+        date || appointment.date,
+        time || appointment.time,
         appointmentId
       ]);
       
@@ -196,6 +298,9 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
         return res.status(409).json({ message: 'This time slot is already booked' });
       }
     }
+    
+    // Start a transaction
+    await db.query('START TRANSACTION');
     
     const updateQuery = `
       UPDATE appointments
@@ -205,18 +310,87 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
     `;
     
     await db.query(updateQuery, [
-      patient_id || currentAppointment[0].patient_id,
-      doctor_id || currentAppointment[0].doctor_id,
-      date || currentAppointment[0].date,
-      time || currentAppointment[0].time,
-      type || currentAppointment[0].type,
-      status || currentAppointment[0].status,
-      notes !== undefined ? notes : currentAppointment[0].notes,
+      patient_id || appointment.patient_id,
+      doctor_id || appointment.doctor_id,
+      date || appointment.date,
+      time || appointment.time,
+      type || appointment.type,
+      status || appointment.status,
+      notes || appointment.notes,
       appointmentId
     ]);
     
-    res.json({ message: 'Appointment updated successfully' });
+    // Create notifications based on what changed
+    if (status && status !== appointment.status) {
+      // Status change notification
+      const statusMessage = `Your appointment on ${date || appointment.date} at ${time || appointment.time} has been ${status.toLowerCase()}.`;
+      
+      // Notify patient about status change
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [
+          appointment.patient_id,
+          'Appointment Status Update',
+          statusMessage,
+          'APPOINTMENT',
+          appointmentId
+        ]
+      );
+      
+      // If appointment is cancelled or completed, notify doctor as well
+      if (status === 'CANCELLED' || status === 'COMPLETED') {
+        const doctorMessage = `The appointment with ${appointment.patient_name} on ${date || appointment.date} at ${time || appointment.time} has been ${status.toLowerCase()}.`;
+        await db.query(
+          'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+          [
+            appointment.doctor_id,
+            'Appointment Update',
+            doctorMessage,
+            'APPOINTMENT',
+            appointmentId
+          ]
+        );
+      }
+    } else if ((date && date !== appointment.date) || (time && time !== appointment.time)) {
+      // Reschedule notification
+      const rescheduleMessage = `Your appointment has been rescheduled to ${date || appointment.date} at ${time || appointment.time}.`;
+      
+      // Notify patient
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [
+          appointment.patient_id,
+          'Appointment Rescheduled',
+          rescheduleMessage,
+          'APPOINTMENT',
+          appointmentId
+        ]
+      );
+      
+      // Notify doctor
+      const doctorRescheduleMessage = `The appointment with ${appointment.patient_name} has been rescheduled to ${date || appointment.date} at ${time || appointment.time}.`;
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [
+          appointment.doctor_id,
+          'Appointment Rescheduled',
+          doctorRescheduleMessage,
+          'APPOINTMENT',
+          appointmentId
+        ]
+      );
+    }
+    
+    // Commit the transaction
+    await db.query('COMMIT');
+    
+    res.json({ 
+      id: appointmentId,
+      message: 'Appointment updated successfully' 
+    });
   } catch (err) {
+    // Rollback in case of error
+    await db.query('ROLLBACK');
     console.error('Error updating appointment:', err);
     res.status(500).json({ message: 'Server error' });
   }
@@ -269,18 +443,63 @@ router.post('/:id/cancel', auth(['admin', 'doctor', 'patient']), async (req, res
     }
     
     // Can't cancel an already cancelled appointment
-    if (appointment.status === 'cancelled') {
+    if (appointment.status === 'CANCELLED') {
       return res.status(400).json({ message: 'Appointment is already cancelled' });
     }
     
+    // Start a transaction
+    await db.query('START TRANSACTION');
+    
     // Update appointment status to cancelled
     await db.query(
-      'UPDATE appointments SET status = "cancelled", updated_at = NOW() WHERE id = ?',
+      'UPDATE appointments SET status = "CANCELLED", updated_at = NOW() WHERE id = ?',
       [appointmentId]
     );
     
-    res.json({ message: 'Appointment cancelled successfully' });
+    // Create notifications for patient and doctor
+    // Get patient and doctor info
+    const [patientInfo] = await db.query('SELECT name FROM patients WHERE id = ?', [appointment.patient_id]);
+    const [doctorInfo] = await db.query('SELECT name FROM doctors WHERE id = ?', [appointment.doctor_id]);
+    
+    if (patientInfo.length > 0 && doctorInfo.length > 0) {
+      const patientName = patientInfo[0].name;
+      const doctorName = doctorInfo[0].name;
+      
+      // Notify the doctor
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [
+          appointment.doctor_id,
+          'Appointment Cancelled',
+          `The appointment with ${patientName} on ${appointment.appointment_date} at ${appointment.appointment_time} has been cancelled.`,
+          'APPOINTMENT',
+          appointmentId
+        ]
+      );
+      
+      // Notify the patient
+      await db.query(
+        'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [
+          appointment.patient_id,
+          'Appointment Cancelled',
+          `Your appointment with ${doctorName} on ${appointment.appointment_date} at ${appointment.appointment_time} has been cancelled.`,
+          'APPOINTMENT',
+          appointmentId
+        ]
+      );
+    }
+    
+    // Commit the transaction
+    await db.query('COMMIT');
+    
+    res.json({ 
+      message: 'Appointment cancelled successfully',
+      id: appointmentId
+    });
   } catch (err) {
+    // Rollback in case of error
+    await db.query('ROLLBACK');
     console.error('Error cancelling appointment:', err);
     res.status(500).json({ message: 'Server error' });
   }
@@ -307,12 +526,12 @@ router.get('/available/:doctorId/:date', async (req, res) => {
     
     // Get booked appointments for that date
     const [bookedSlots] = await db.query(
-      'SELECT time FROM appointments WHERE doctor_id = ? AND date = ? AND status != "cancelled"',
+      'SELECT appointment_time FROM appointments WHERE doctor_id = ? AND appointment_date = ? AND status != "CANCELLED"',
       [doctorId, date]
     );
     
     // Generate available time slots (assuming 30-minute intervals)
-    const availableSlots = generateTimeSlots(startTime, endTime, bookedSlots.map(slot => slot.time));
+    const availableSlots = generateTimeSlots(startTime, endTime, bookedSlots.map(slot => slot.appointment_time));
     
     res.json(availableSlots);
   } catch (err) {
@@ -352,5 +571,67 @@ function generateTimeSlots(startTime, endTime, bookedSlots) {
   
   return slots;
 }
+
+// Get notifications for a user
+router.get('/notifications/:userId', auth(['admin', 'doctor', 'patient']), async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    // Verify that the user is authorized to access these notifications
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ message: 'Unauthorized to access these notifications' });
+    }
+    
+    const query = `
+      SELECT n.*, 
+             a.appointment_date, 
+             a.appointment_time,
+             a.appointment_type,
+             a.status as appointment_status
+      FROM notifications n
+      LEFT JOIN appointments a ON n.reference_id = a.id AND n.notification_type = 'APPOINTMENT'
+      WHERE n.user_id = ?
+      ORDER BY n.created_at DESC
+      LIMIT 50
+    `;
+    
+    const [notifications] = await db.query(query, [userId]);
+    res.json(notifications);
+  } catch (err) {
+    console.error('Error fetching notifications:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Mark notification as read
+router.put('/notifications/:notificationId/read', auth(['admin', 'doctor', 'patient']), async (req, res) => {
+  try {
+    const notificationId = req.params.notificationId;
+    
+    // Verify that the user is authorized to update this notification
+    const [notificationRows] = await db.query(
+      'SELECT user_id FROM notifications WHERE id = ?', 
+      [notificationId]
+    );
+    
+    if (notificationRows.length === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+    
+    if (req.user.role !== 'admin' && req.user.id !== notificationRows[0].user_id) {
+      return res.status(403).json({ message: 'Unauthorized to update this notification' });
+    }
+    
+    await db.query(
+      'UPDATE notifications SET is_read = true WHERE id = ?',
+      [notificationId]
+    );
+    
+    res.json({ message: 'Notification marked as read' });
+  } catch (err) {
+    console.error('Error updating notification:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router; 

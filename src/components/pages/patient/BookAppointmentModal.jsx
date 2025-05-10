@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../../../styles/pages/patient/BookAppointmentModal.css';
-import { doctorApi, appointmentApi } from '../../../services/api';
+import { doctorApi, appointmentApi, patientApi } from '../../../services/api';
 
 const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointment }) => {
-  const [step, setStep] = useState(1); // 1: Select doctor, 2: Choose date/time, 3: Confirm
+  const [step, setStep] = useState(1); // 1: Select doctor, 2: Choose date/time, 3: Enter medical details, 4: Confirm
   const [formData, setFormData] = useState({
     doctorId: '',
     doctorName: '',
@@ -12,7 +12,20 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
     time: '',
     type: 'Consultation',
     problem: '',
-    notes: ''
+    notes: '',
+    // Additional patient details
+    age: '',
+    bloodGroup: '',
+    gender: '',
+    allergyHistory: '',
+    currentMedications: '',
+    pastMedicalHistory: '',
+    height: '',
+    weight: '',
+    temperature: '',
+    bloodPressure: '',
+    pulse: '',
+    oxygenSaturation: ''
   });
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
   const [doctors, setDoctors] = useState([]);
@@ -21,6 +34,7 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [specializations, setSpecializations] = useState([]);
+  const [patientInfo, setPatientInfo] = useState(null);
 
   // Fetch doctors on component mount
   useEffect(() => {
@@ -48,7 +62,29 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
     };
 
     fetchDoctors();
-  }, []);
+    
+    // Fetch patient info for pre-filling form fields
+    const fetchPatientInfo = async () => {
+      try {
+        if (patientId) {
+          const patientData = await patientApi.getPatientById(patientId);
+          setPatientInfo(patientData);
+          
+          // Pre-fill form data with patient information
+          setFormData(prev => ({
+            ...prev,
+            age: patientData.age || '',
+            gender: patientData.gender || '',
+            bloodGroup: patientData.bloodGroup || ''
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch patient information:", error);
+      }
+    };
+    
+    fetchPatientInfo();
+  }, [patientId]);
 
   // Filter doctors when specialization changes
   useEffect(() => {
@@ -111,24 +147,67 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
-    // Create appointment object
-    const appointmentData = {
-      patientId,
-      patientName,
-      doctorId: formData.doctorId,
-      doctorName: formData.doctorName,
-      doctorSpecialization: formData.specialization,
-      appointmentDate: formData.date,
-      appointmentTime: formData.time,
-      appointmentType: formData.type,
-      problem: formData.problem,
-      notes: formData.notes,
-      status: 'PENDING'
-    };
+    try {
+        // Extract patient ID from localStorage to ensure it's current
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const currentPatientId = userData.id || patientId;
+        
+        if (!currentPatientId) {
+            throw new Error('Patient ID not found. Please log in again.');
+        }
+        
+        // Format the appointment data
+        const appointmentData = {
+            patientId: currentPatientId,
+            patientName: patientName,
+            doctorId: formData.doctorId,
+            doctorName: formData.doctorName,
+            doctorSpecialization: formData.specialization,
+            appointmentDate: formData.date,
+            appointmentTime: formData.time,
+            appointmentType: formData.type,
+            problem: formData.problem,
+            notes: formData.notes,
+            // Include patient medical details
+            patientDetails: {
+                age: formData.age,
+                bloodGroup: formData.bloodGroup,
+                gender: formData.gender,
+                allergyHistory: formData.allergyHistory,
+                currentMedications: formData.currentMedications,
+                pastMedicalHistory: formData.pastMedicalHistory,
+                vitalSigns: {
+                    height: formData.height,
+                    weight: formData.weight,
+                    temperature: formData.temperature,
+                    bloodPressure: formData.bloodPressure,
+                    pulse: formData.pulse,
+                    oxygenSaturation: formData.oxygenSaturation
+                }
+            }
+        };
 
-    // Pass to parent component to handle API call
-    onAddAppointment(appointmentData);
+        console.log('Submitting appointment data:', appointmentData);
+
+        // Call the API to create the appointment
+        const response = await appointmentApi.createAppointment(appointmentData);
+        
+        console.log('Appointment created successfully:', response);
+
+        // Pass to parent component to update UI
+        onAddAppointment(response);
+        
+        // Display success message in step 4
+        setStep(4);
+    } catch (error) {
+        console.error("Failed to create appointment:", error);
+        setError(error.message || "Failed to book appointment. Please try again.");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const renderStep1 = () => (
@@ -280,40 +359,259 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
           className="next-btn"
           disabled={!formData.date || !formData.time}
         >
-          Review & Confirm <i className="fas fa-arrow-right"></i>
+          Next: Medical Details <i className="fas fa-arrow-right"></i>
         </button>
       </div>
     </form>
   );
 
   const renderStep3 = () => (
+    <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} className="appointment-form">
+      <h3>Patient Medical Details</h3>
+      <p className="form-description">Please provide your health information to help the doctor prepare for your appointment.</p>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="age">Age</label>
+          <input 
+            type="number" 
+            id="age" 
+            name="age"
+            value={formData.age}
+            onChange={handleChange}
+            placeholder="Years"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="gender">Gender</label>
+          <select 
+            id="gender" 
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="bloodGroup">Blood Group</label>
+          <select 
+            id="bloodGroup" 
+            name="bloodGroup"
+            value={formData.bloodGroup}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select blood group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="height">Height (cm)</label>
+          <input 
+            type="number" 
+            id="height" 
+            name="height"
+            value={formData.height}
+            onChange={handleChange}
+            placeholder="In centimeters"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="weight">Weight (kg)</label>
+          <input 
+            type="number" 
+            id="weight" 
+            name="weight"
+            value={formData.weight}
+            onChange={handleChange}
+            placeholder="In kilograms"
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="temperature">Temperature (°F)</label>
+          <input 
+            type="text" 
+            id="temperature" 
+            name="temperature"
+            value={formData.temperature}
+            onChange={handleChange}
+            placeholder="98.6°F"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="bloodPressure">Blood Pressure (mm Hg)</label>
+          <input 
+            type="text" 
+            id="bloodPressure" 
+            name="bloodPressure"
+            value={formData.bloodPressure}
+            onChange={handleChange}
+            placeholder="120/80"
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="pulse">Pulse (bpm)</label>
+          <input 
+            type="text" 
+            id="pulse" 
+            name="pulse"
+            value={formData.pulse}
+            onChange={handleChange}
+            placeholder="72 bpm"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="oxygenSaturation">Oxygen Saturation (%)</label>
+          <input 
+            type="text" 
+            id="oxygenSaturation" 
+            name="oxygenSaturation"
+            value={formData.oxygenSaturation}
+            onChange={handleChange}
+            placeholder="98%"
+          />
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="allergyHistory">Allergies (if any)</label>
+        <textarea 
+          id="allergyHistory" 
+          name="allergyHistory"
+          value={formData.allergyHistory}
+          onChange={handleChange}
+          rows="2"
+          placeholder="List any allergies to medications, food, or other substances"
+        ></textarea>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="currentMedications">Current Medications</label>
+        <textarea 
+          id="currentMedications" 
+          name="currentMedications"
+          value={formData.currentMedications}
+          onChange={handleChange}
+          rows="2"
+          placeholder="List any medications you are currently taking with dosage"
+        ></textarea>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="pastMedicalHistory">Past Medical History</label>
+        <textarea 
+          id="pastMedicalHistory" 
+          name="pastMedicalHistory"
+          value={formData.pastMedicalHistory}
+          onChange={handleChange}
+          rows="3"
+          placeholder="Any previous surgeries, hospitalizations, or significant medical conditions"
+        ></textarea>
+      </div>
+
+      <div className="form-actions">
+        <button type="button" className="back-btn" onClick={() => setStep(2)}>
+          <i className="fas fa-arrow-left"></i> Back
+        </button>
+        <button type="submit" className="next-btn">
+          Review & Confirm <i className="fas fa-arrow-right"></i>
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderStep4 = () => (
     <div className="confirmation-step">
       <h3>Review Appointment Details</h3>
       
       <div className="confirmation-details">
-        <div className="detail-item">
-          <span className="detail-label">Doctor:</span>
-          <span className="detail-value">{formData.doctorName}</span>
+        <div className="confirmation-section">
+          <h4>Appointment Information</h4>
+          <div className="detail-item">
+            <span className="detail-label">Doctor:</span>
+            <span className="detail-value">{formData.doctorName}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Specialization:</span>
+            <span className="detail-value">{formData.specialization}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Date:</span>
+            <span className="detail-value">{formData.date}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Time:</span>
+            <span className="detail-value">{formData.time}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Type:</span>
+            <span className="detail-value">{formData.type}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Problem:</span>
+            <span className="detail-value">{formData.problem}</span>
+          </div>
         </div>
-        <div className="detail-item">
-          <span className="detail-label">Specialization:</span>
-          <span className="detail-value">{formData.specialization}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">Date:</span>
-          <span className="detail-value">{formData.date}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">Time:</span>
-          <span className="detail-value">{formData.time}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">Type:</span>
-          <span className="detail-value">{formData.type}</span>
-        </div>
-        <div className="detail-item">
-          <span className="detail-label">Problem:</span>
-          <span className="detail-value">{formData.problem}</span>
+
+        <div className="confirmation-section">
+          <h4>Patient Information</h4>
+          <div className="detail-item">
+            <span className="detail-label">Age:</span>
+            <span className="detail-value">{formData.age}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Gender:</span>
+            <span className="detail-value">{formData.gender}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Blood Group:</span>
+            <span className="detail-value">{formData.bloodGroup}</span>
+          </div>
+          <div className="detail-item">
+            <span className="detail-label">Height/Weight:</span>
+            <span className="detail-value">{formData.height ? formData.height + ' cm' : '-'} / {formData.weight ? formData.weight + ' kg' : '-'}</span>
+          </div>
+          {formData.allergyHistory && (
+            <div className="detail-item">
+              <span className="detail-label">Allergies:</span>
+              <span className="detail-value">{formData.allergyHistory}</span>
+            </div>
+          )}
+          {formData.currentMedications && (
+            <div className="detail-item">
+              <span className="detail-label">Current Medications:</span>
+              <span className="detail-value">{formData.currentMedications}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -337,13 +635,27 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
       </div>
 
       <div className="form-actions">
-        <button type="button" className="back-btn" onClick={() => setStep(2)}>
+        <button type="button" className="back-btn" onClick={() => setStep(3)}>
           <i className="fas fa-arrow-left"></i> Back
         </button>
         <button type="button" className="submit-btn" onClick={handleSubmit}>
           <i className="fas fa-check-circle"></i> Confirm Booking
         </button>
       </div>
+    </div>
+  );
+
+  const renderSuccessMessage = () => (
+    <div className="success-message">
+      <div className="success-icon">
+        <i className="fas fa-check-circle"></i>
+      </div>
+      <h3>Appointment Scheduled Successfully!</h3>
+      <p>Your appointment with {formData.doctorName} has been booked for {formData.date} at {formData.time}.</p>
+      <p>You will receive a confirmation notification, and the appointment details will appear in your dashboard.</p>
+      <button type="button" className="close-success-btn" onClick={onClose}>
+        Close
+      </button>
     </div>
   );
 
@@ -368,6 +680,10 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
           </div>
           <div className={`step ${step >= 3 ? 'active' : ''}`}>
             <div className="step-number">3</div>
+            <span className="step-label">Medical Details</span>
+          </div>
+          <div className={`step ${step >= 4 ? 'active' : ''}`}>
+            <div className="step-number">4</div>
             <span className="step-label">Confirm</span>
           </div>
         </div>
@@ -380,9 +696,20 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
         )}
 
         <div className="modal-body">
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
+          {isLoading ? (
+            <div className="loading-spinner">
+              <i className="fas fa-spinner fa-spin"></i>
+              <p>Processing your appointment...</p>
+            </div>
+          ) : (
+            <>
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+              {step === 4 && renderStep4()}
+              {step === 5 && renderSuccessMessage()}
+            </>
+          )}
         </div>
       </div>
     </div>

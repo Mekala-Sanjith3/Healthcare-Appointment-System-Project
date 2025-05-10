@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "../../../styles/pages/patient/PatientDashboard.css";
+import "../../../styles/pages/patient/MedicalRecords.css"; // Import the new CSS file
 import BookAppointmentModal from './BookAppointmentModal';
+import DoctorSearch from './DoctorSearch';
 import { appointmentApi, patientApi, medicalRecordsApi, reviewsApi } from '../../../services/api';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -43,6 +47,82 @@ const PatientDashboard = () => {
   });
   const [pastDoctors, setPastDoctors] = useState([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  
+  // New states for additional features
+  const [medications, setMedications] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [showAddMedicationModal, setShowAddMedicationModal] = useState(false);
+  const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
+  const [medicationFormData, setMedicationFormData] = useState({
+    name: '',
+    dosage: '',
+    frequency: '',
+    startDate: '',
+    endDate: '',
+    notes: '',
+    reminder: false
+  });
+  const [healthAnalytics, setHealthAnalytics] = useState({
+    bloodPressure: [
+      {date: '2023-01-15', systolic: 120, diastolic: 80},
+      {date: '2023-02-15', systolic: 118, diastolic: 78},
+      {date: '2023-03-15', systolic: 122, diastolic: 82},
+      {date: '2023-04-15', systolic: 121, diastolic: 79}
+    ],
+    glucose: [
+      {date: '2023-01-15', value: 95},
+      {date: '2023-02-15', value: 98},
+      {date: '2023-03-15', value: 97},
+      {date: '2023-04-15', value: 94}
+    ],
+    weight: [
+      {date: '2023-01-15', value: 70},
+      {date: '2023-02-15', value: 69.5},
+      {date: '2023-03-15', value: 69},
+      {date: '2023-04-15', value: 68.5}
+    ]
+  });
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [documentFormData, setDocumentFormData] = useState({
+    title: '',
+    type: 'lab_result',
+    date: '',
+    file: null
+  });
+  
+  // Quick actions state
+  const [showQuickActions, setShowQuickActions] = useState(true);
+
+  // Add useRef for dropdown
+  const dropdownRef = useRef(null);
+
+  // Add these state variables for medical records functionality
+  const [activeRecordFilter, setActiveRecordFilter] = useState('all');
+  const [showRecordActionsMenu, setShowRecordActionsMenu] = useState(null);
+  
+  // Add view type state for medical records
+  const [recordViewType, setRecordViewType] = useState('grid'); // 'grid' or 'timeline'
+  
+  // Handle clicks outside of dropdown to close it
+  useEffect(() => {
+    function handleClickOutside(event) {
+      // Check if the click was on the button (which should toggle, not close)
+      const isWriteReviewButton = event.target.closest('.write-review-btn');
+      
+      // Only close if dropdown is open, click is outside dropdown, and not on the button
+      if (dropdownOpen && dropdownRef.current && !dropdownRef.current.contains(event.target) && !isWriteReviewButton) {
+        setDropdownOpen(false);
+      }
+    }
+
+    // Add event listener
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      // Remove event listener on cleanup
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen, dropdownRef]);
 
   useEffect(() => {
     // Get user data from localStorage
@@ -59,21 +139,39 @@ const PatientDashboard = () => {
         return;
       }
       
+      // Set initial userData from localStorage
+      setUserData({
+        id: storedUserData.id,
+        email: storedUserData.email || '',
+        name: storedUserData.name || storedUserData.email?.split('@')[0] || 'Patient'
+      });
+      
       // Fetch patient details and appointments
       const fetchPatientData = async () => {
         setIsLoading(true);
         try {
           // Fetch patient profile
           const patientProfile = await patientApi.getPatientProfile(storedUserData.id);
-          setUserData({
+          console.log("Fetched patient profile:", patientProfile);
+          
+          // Update userData with the retrieved profile data
+          setUserData(prevData => ({
+            ...prevData,
             id: storedUserData.id,
-            email: patientProfile.email || storedUserData.email,
-            name: patientProfile.name || storedUserData.email.split('@')[0]
-          });
+            email: patientProfile.email || storedUserData.email || '',
+            name: patientProfile.name || patientProfile.fullName || storedUserData.name || storedUserData.email?.split('@')[0] || 'Patient'
+          }));
           
           // Fetch patient appointments
           const patientAppointments = await appointmentApi.getAppointmentsByPatientId(storedUserData.id);
-          setAppointments(patientAppointments);
+          console.log('Fetched patient appointments:', patientAppointments);
+          
+          if (patientAppointments && Array.isArray(patientAppointments)) {
+            setAppointments(patientAppointments);
+          } else {
+            console.error('Invalid response format for appointments');
+            setError("Failed to load your appointments. Invalid data format received.");
+          }
         } catch (error) {
           console.error("Failed to load patient data:", error);
           setError("Failed to load your data. Please refresh the page or contact support.");
@@ -89,14 +187,93 @@ const PatientDashboard = () => {
     }
   }, [navigate]);
 
-  // Fetch medical records when history tab is active
+  // Add a new useEffect to reload appointments when the tab changes to appointments
+  useEffect(() => {
+    if (activeTab === 'appointments' && userData.id) {
+      const fetchAppointments = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          console.log('Fetching appointments for patient:', userData.id);
+          
+          // Try to fetch from the API
+          let patientAppointments = [];
+          try {
+            patientAppointments = await appointmentApi.getAppointmentsByPatientId(userData.id);
+            console.log('Retrieved appointments from API:', patientAppointments.length, 'appointments found');
+          } catch (apiError) {
+            console.error('Error fetching from API:', apiError);
+            // Fallback: check in localStorage for the appointment data directly
+            console.log('Falling back to mockAppointments in localStorage');
+            const allAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
+            
+            // Filter and deduplicate mock appointments for this patient
+            const uniqueAppointmentsMap = new Map();
+            allAppointments.forEach(app => {
+              if (app.patientId === userData.id) {
+                uniqueAppointmentsMap.set(app.id, app);
+              }
+            });
+            
+            patientAppointments = Array.from(uniqueAppointmentsMap.values());
+            console.log('Retrieved appointments from localStorage:', patientAppointments.length, 'appointments found');
+            
+            // Cache these appointments to make them accessible via the API next time
+            localStorage.setItem(`patient_${userData.id}_appointments`, JSON.stringify(patientAppointments));
+          }
+          
+          if (patientAppointments && Array.isArray(patientAppointments)) {
+            // Sort appointments by date (most recent first)
+            patientAppointments.sort((a, b) => {
+              // Convert dates to comparable format
+              const dateA = new Date(a.appointmentDate + ' ' + (a.appointmentTime || '00:00'));
+              const dateB = new Date(b.appointmentDate + ' ' + (b.appointmentTime || '00:00'));
+              return dateB - dateA; // Descending order (most recent first)
+            });
+            
+            setAppointments(patientAppointments);
+          } else {
+            console.error('Invalid response format for appointments');
+            setError("Failed to load your appointments. Invalid data format received.");
+          }
+        } catch (error) {
+          console.error("Failed to load appointments:", error);
+          setError("Failed to load your appointments. Please try again later.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchAppointments();
+    }
+  }, [activeTab, userData.id]);
+
+  // Update the useEffect that loads medical records
   useEffect(() => {
     if (activeTab === 'history' && userData.id) {
       const fetchMedicalRecords = async () => {
         setIsLoadingRecords(true);
+        setError(null);
         try {
+          console.log('Fetching medical records for patient:', userData.id);
+          
+          // Debug localStorage first
+          medicalRecordsApi.debugLocalStorage(userData.id);
+          
+          // Try to fetch records from API
           const records = await medicalRecordsApi.getPatientMedicalHistory(userData.id);
-          setMedicalRecords(records);
+          
+          if (records && Array.isArray(records)) {
+            console.log('Retrieved medical records:', records.length, 'records found');
+            setMedicalRecords(records);
+            if (records.length === 0) {
+              // Don't show error, just show empty state
+              console.log('No medical records found for patient');
+            }
+          } else {
+            console.error('Invalid response format for medical records');
+            setError("Failed to load your medical history. Invalid data format received.");
+          }
         } catch (error) {
           console.error("Failed to load medical records:", error);
           setError("Failed to load your medical history. Please try again later.");
@@ -106,6 +283,12 @@ const PatientDashboard = () => {
       };
       
       fetchMedicalRecords();
+      
+      // Return cleanup function
+      return () => {
+        console.log("Cleaning up medical records fetch effect");
+        // Can be used to abort fetch if needed
+      };
     }
   }, [activeTab, userData.id]);
 
@@ -264,17 +447,38 @@ const PatientDashboard = () => {
     }
   };
 
+  // Handle adding a new appointment
   const handleAddAppointment = async (newAppointment) => {
     try {
-      // Add appointment using the API
-      const savedAppointment = await appointmentApi.createAppointment(newAppointment);
-      
-      // Update state with the new appointment
-      setAppointments(prev => [...prev, savedAppointment]);
+      console.log("Adding new appointment:", newAppointment);
+      // Close modal
       setShowBookAppointmentModal(false);
+      
+      // Add the appointment to the API
+      const addedAppointment = await appointmentApi.createAppointment({
+        ...newAppointment,
+        patientId: userData.id,
+        patientName: userData.name
+      });
+      
+      console.log("Appointment added successfully:", addedAppointment);
+      
+      // Update the appointments list with the new appointment
+      setAppointments(prevAppointments => {
+        // Check if appointment already exists to avoid duplicates
+        const exists = prevAppointments.some(app => app.id === addedAppointment.id);
+        if (exists) {
+          return prevAppointments; // Don't add duplicate
+        }
+        return [addedAppointment, ...prevAppointments];
+      });
+      
+      // Show success message
+      setError(null);
+      alert("Appointment booked successfully!");
     } catch (error) {
-      console.error("Failed to create appointment:", error);
-      setError("Failed to book appointment. Please try again.");
+      console.error("Failed to book appointment:", error);
+      setError("Failed to book your appointment. Please try again.");
     }
   };
 
@@ -355,6 +559,7 @@ const PatientDashboard = () => {
 
   // Handle opening the review modal
   const handleOpenReviewModal = (doctor) => {
+    console.log("Opening review modal for doctor:", doctor);
     setSelectedDoctor(doctor);
     setReviewFormData({
       rating: 5,
@@ -385,12 +590,14 @@ const PatientDashboard = () => {
         patientId: userData.id,
         doctorId: selectedDoctor.id,
         doctorName: selectedDoctor.name,
-        doctorSpecialty: selectedDoctor.specialty,
+        doctorSpecialty: selectedDoctor.specialty || selectedDoctor.specialization || "General Medicine",
         rating: parseInt(reviewFormData.rating),
         review: reviewFormData.comment,
         isAnonymous: reviewFormData.anonymous,
-        lastAppointmentDate: selectedDoctor.lastAppointmentDate || selectedDoctor.lastVisit
+        lastAppointmentDate: selectedDoctor.lastAppointmentDate || new Date().toISOString()
       };
+      
+      console.log("Submitting review:", reviewData);
       
       // Submit the review using the API
       const newReview = await reviewsApi.createReview(reviewData);
@@ -418,6 +625,501 @@ const PatientDashboard = () => {
     return stars;
   };
 
+  // Add this function to render medical records
+  const renderMedicalRecords = () => {
+    if (isLoadingRecords) {
+      return (
+        <div className="loading-section">
+          <i className="fas fa-spinner fa-spin"></i>
+          <p>Loading your medical records...</p>
+        </div>
+      );
+    }
+    
+    if (error) {
+      return (
+        <div className="error-section">
+          <i className="fas fa-exclamation-circle"></i>
+          <p>{error}</p>
+          <button 
+            className="retry-button"
+            onClick={() => {
+              setError(null); // Clear the error first
+              setActiveTab('history'); // This will trigger the useEffect to reload
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    
+    // Check if medicalRecords is truly empty or undefined/null
+    if (!medicalRecords || !Array.isArray(medicalRecords) || medicalRecords.length === 0) {
+      return (
+        <div className="empty-section">
+          <i className="fas fa-file-medical-alt"></i>
+          <h3>No Medical Records Found</h3>
+          <p>You don't have any medical records in our system yet.</p>
+          <button 
+            className="retry-button"
+            onClick={() => {
+              setActiveTab('appointments'); // Go to appointments
+              setTimeout(() => setActiveTab('history'), 100); // Then come back to history to refresh
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      );
+    }
+    
+    console.log("Rendering medical records:", medicalRecords);
+    
+    // Filter records based on search query if any
+    let filteredRecords = recordSearchQuery 
+      ? medicalRecords.filter(record =>
+          (record.diagnosis && record.diagnosis.toLowerCase().includes(recordSearchQuery.toLowerCase())) ||
+          (record.doctorName && record.doctorName.toLowerCase().includes(recordSearchQuery.toLowerCase())) ||
+          (record.doctor_name && record.doctor_name.toLowerCase().includes(recordSearchQuery.toLowerCase())) ||
+          (record.description && record.description.toLowerCase().includes(recordSearchQuery.toLowerCase())) ||
+          (record.date && record.date.includes(recordSearchQuery))
+        )
+      : medicalRecords;
+    
+    // Apply additional filter based on activeRecordFilter
+    if (activeRecordFilter !== 'all') {
+      filteredRecords = filteredRecords.filter(record => {
+        const recordType = getRecordTypeClass(record);
+        return activeRecordFilter === recordType;
+      });
+    }
+    
+    // Function to determine record type class
+    const getRecordTypeClass = (record) => {
+      if (record.diagnosis && record.diagnosis.toLowerCase().includes('lab')) return 'lab-result';
+      if (record.diagnosis && record.diagnosis.toLowerCase().includes('prescription')) return 'prescription';
+      if (record.prescription || record.prescriptions) return 'prescription';
+      return 'consultation';
+    };
+    
+    // Function to handle record download
+    const handleDownloadRecord = (record) => {
+      try {
+        // Create a new PDF document
+        const doc = new jsPDF();
+        
+        // Add a title
+        doc.setFontSize(18);
+        doc.setTextColor(44, 62, 80); // Dark blue color
+        doc.text('Medical Record', 105, 15, { align: 'center' });
+        
+        // Add horizontal line
+        doc.setDrawColor(52, 152, 219); // Blue color
+        doc.setLineWidth(0.5);
+        doc.line(14, 20, 196, 20);
+        
+        // Add record information header
+        doc.setFontSize(12);
+        doc.setTextColor(44, 62, 80);
+        doc.text(`Record ID: ${record.id}`, 14, 30);
+        doc.text(`Date: ${record.date}`, 14, 38);
+        doc.text(`Doctor: ${record.doctorName || record.doctor_name}`, 14, 46);
+        doc.text(`Specialty: ${record.specialty || 'General'}`, 14, 54);
+        
+        // Add record details in a table
+        const recordData = [
+          ['DIAGNOSIS', record.diagnosis || 'N/A'],
+          ['DESCRIPTION', record.description || 'N/A'],
+          ['PRESCRIPTION', record.prescription || record.prescriptions || 'N/A'],
+          ['TREATMENT PLAN', record.treatment_plan || record.treatmentPlan || 'N/A'],
+          ['NOTES', record.notes || 'N/A']
+        ];
+        
+        doc.autoTable({
+          startY: 65,
+          head: [['Field', 'Details']],
+          body: recordData,
+          theme: 'grid',
+          headStyles: { fillColor: [52, 152, 219], textColor: 255 },
+          styles: { overflow: 'linebreak', cellWidth: 'wrap' },
+          columnStyles: { 
+            0: { cellWidth: 40, fontStyle: 'bold' },
+            1: { cellWidth: 'auto' }
+          }
+        });
+        
+        // Add footer with date
+        const pageHeight = doc.internal.pageSize.height;
+        doc.setFontSize(10);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Created: ${new Date(record.createdAt).toLocaleDateString()}`, 14, pageHeight - 10);
+        doc.text('Healthcare Appointment System - CONFIDENTIAL', 105, pageHeight - 10, { align: 'center' });
+        
+        // Save the PDF
+        doc.save(`Medical_Record_${record.id}_${record.date}.pdf`);
+        
+        // Close the actions menu
+        setShowRecordActionsMenu(null);
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Failed to generate PDF. Please try again.');
+      }
+    };
+    
+    // Function to share a record
+    const handleShareRecord = (record) => {
+      if (navigator.share) {
+        navigator.share({
+          title: `Medical Record - ${record.date}`,
+          text: `Medical record from ${record.doctorName || record.doctor_name}: ${record.diagnosis}`,
+          url: window.location.href
+        }).then(() => {
+          console.log('Successfully shared record');
+        }).catch((error) => {
+          console.error('Error sharing record:', error);
+        });
+      } else {
+        // Fallback for browsers that don't support native sharing
+        alert('Share feature not supported by your browser. You can download the record and share it manually.');
+      }
+      
+      // Close the actions menu
+      setShowRecordActionsMenu(null);
+    };
+    
+    // Function to print a record
+    const handlePrintRecord = (record) => {
+      window.print();
+      
+      // Close the actions menu
+      setShowRecordActionsMenu(null);
+    };
+    
+    // Group records by date for timeline view
+    const groupRecordsByDate = (records) => {
+      const groups = {};
+      
+      records.forEach(record => {
+        const date = record.date;
+        if (!groups[date]) {
+          groups[date] = [];
+        }
+        groups[date].push(record);
+      });
+      
+      // Convert to array and sort by date (newest first)
+      return Object.entries(groups)
+        .map(([date, records]) => ({ date, records }))
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+    };
+    
+    // Grouped records for timeline view
+    const groupedRecords = groupRecordsByDate(filteredRecords);
+    
+    // Render timeline view
+    const renderTimelineView = () => {
+      if (filteredRecords.length === 0) {
+        return null; // Empty state is handled separately
+      }
+      
+      return (
+        <div className="health-timeline">
+          <div className="timeline-line"></div>
+          
+          {groupedRecords.map(group => (
+            <div key={group.date} className="records-date-group">
+              <div className="records-date-heading">{new Date(group.date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric'
+              })}</div>
+              
+              {group.records.map(record => (
+                <div key={record.id} className="timeline-event">
+                  <div className={`timeline-dot ${getRecordTypeClass(record)}`}></div>
+                  <div className={`timeline-content ${getRecordTypeClass(record)}`}>
+                    <div className="timeline-date">
+                      <i className={`fas ${
+                        getRecordTypeClass(record) === 'lab-result' ? 'fa-flask' : 
+                        getRecordTypeClass(record) === 'prescription' ? 'fa-prescription-bottle-alt' : 'fa-user-md'
+                      }`}></i>
+                      {getRecordTypeClass(record).replace('-', ' ')}
+                    </div>
+                    
+                    <div className="timeline-title">
+                      {record.diagnosis}
+                      <span className="doctor-name-small"> by {record.doctorName || record.doctor_name}</span>
+                    </div>
+                    
+                    <div className="timeline-description">
+                      {record.description || 
+                       (record.prescription || record.prescriptions) || 
+                       (record.treatment_plan || record.treatmentPlan) || 
+                       record.notes || 
+                       'No additional details'}
+                    </div>
+                    
+                    <div className="timeline-actions">
+                      <button 
+                        className="download-record-btn"
+                        onClick={() => handleDownloadRecord(record)}
+                      >
+                        <i className="fas fa-download"></i> Download
+                      </button>
+                      <button 
+                        className="share-record-btn"
+                        onClick={() => handleShareRecord(record)}
+                      >
+                        <i className="fas fa-share-alt"></i> Share
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    };
+    
+    return (
+      <div className="medical-records-container">
+        <div className="medical-records-header">
+          <h3>Medical Records</h3>
+          <div className="header-controls">
+            <div className="view-toggle">
+              <button 
+                className={`view-btn ${recordViewType === 'grid' ? 'active' : ''}`}
+                onClick={() => setRecordViewType('grid')}
+                title="Grid View"
+              >
+                <i className="fas fa-th-large"></i>
+              </button>
+              <button 
+                className={`view-btn ${recordViewType === 'timeline' ? 'active' : ''}`}
+                onClick={() => setRecordViewType('timeline')}
+                title="Timeline View"
+              >
+                <i className="fas fa-stream"></i>
+              </button>
+            </div>
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search records..."
+                value={recordSearchQuery}
+                onChange={(e) => setRecordSearchQuery(e.target.value)}
+              />
+              <i className="fas fa-search"></i>
+            </div>
+          </div>
+        </div>
+        
+        <div className="record-filter-tabs">
+          <div 
+            className={`filter-tab ${activeRecordFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveRecordFilter('all')}
+          >
+            <i className="fas fa-clipboard-list"></i> All Records
+          </div>
+          <div 
+            className={`filter-tab ${activeRecordFilter === 'lab-result' ? 'active' : ''}`}
+            onClick={() => setActiveRecordFilter('lab-result')}
+          >
+            <i className="fas fa-flask"></i> Lab Results
+          </div>
+          <div 
+            className={`filter-tab ${activeRecordFilter === 'prescription' ? 'active' : ''}`}
+            onClick={() => setActiveRecordFilter('prescription')}
+          >
+            <i className="fas fa-prescription-bottle-alt"></i> Prescriptions
+          </div>
+          <div 
+            className={`filter-tab ${activeRecordFilter === 'consultation' ? 'active' : ''}`}
+            onClick={() => setActiveRecordFilter('consultation')}
+          >
+            <i className="fas fa-user-md"></i> Consultations
+          </div>
+        </div>
+        
+        <div className="medical-records-list">
+          {filteredRecords.length > 0 ? (
+            recordViewType === 'grid' ? (
+              // Grid view
+              filteredRecords.map(record => (
+                <div key={record.id} className={`medical-record-card ${getRecordTypeClass(record)}`}>
+                  {/* Record actions menu */}
+                  <div className="record-actions-menu">
+                    <button 
+                      className="menu-toggle"
+                      onClick={() => setShowRecordActionsMenu(showRecordActionsMenu === record.id ? null : record.id)}
+                    >
+                      <i className="fas fa-ellipsis-v"></i>
+                    </button>
+                    
+                    {showRecordActionsMenu === record.id && (
+                      <div className="menu-dropdown">
+                        <div 
+                          className="menu-item"
+                          onClick={() => handleDownloadRecord(record)}
+                        >
+                          <i className="fas fa-download"></i>
+                          Download
+                        </div>
+                        <div 
+                          className="menu-item"
+                          onClick={() => handleShareRecord(record)}
+                        >
+                          <i className="fas fa-share-alt"></i>
+                          Share
+                        </div>
+                        <div 
+                          className="menu-item"
+                          onClick={() => handlePrintRecord(record)}
+                        >
+                          <i className="fas fa-print"></i>
+                          Print
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="record-header">
+                    <div className="doctor-info">
+                      <i className={`fas ${
+                        getRecordTypeClass(record) === 'lab-result' ? 'fa-flask' : 
+                        getRecordTypeClass(record) === 'prescription' ? 'fa-prescription-bottle-alt' : 'fa-user-md'
+                      }`}></i>
+                      <div>
+                        <span className="doctor-name">{record.doctorName || record.doctor_name}</span>
+                        <span className="specialty">{record.specialty}</span>
+                      </div>
+                    </div>
+                    <div className="record-date">
+                      <i className="fas fa-calendar-alt"></i>
+                      {record.date}
+                    </div>
+                  </div>
+                  
+                  <div className="record-body">
+                    <div className="record-field">
+                      <h4>
+                        <i className="fas fa-stethoscope"></i>
+                        Diagnosis
+                      </h4>
+                      <div className="diagnosis-badge">{record.diagnosis}</div>
+                    </div>
+                    
+                    {(record.description || record.description === '') && (
+                      <div className="record-field">
+                        <h4>
+                          <i className="fas fa-file-medical-alt"></i>
+                          Description
+                        </h4>
+                        <p>{record.description}</p>
+                      </div>
+                    )}
+                    
+                    {(record.prescription || record.prescriptions) && (
+                      <div className="record-field">
+                        <h4>
+                          <i className="fas fa-prescription-bottle-alt"></i>
+                          Prescription
+                        </h4>
+                        <p>{record.prescription || record.prescriptions}</p>
+                      </div>
+                    )}
+                    
+                    {(record.treatment_plan || record.treatmentPlan) && (
+                      <div className="record-field">
+                        <h4>
+                          <i className="fas fa-clipboard-list"></i>
+                          Treatment Plan
+                        </h4>
+                        <p>{record.treatment_plan || record.treatmentPlan}</p>
+                      </div>
+                    )}
+                    
+                    {record.notes && (
+                      <div className="record-field">
+                        <h4>
+                          <i className="fas fa-sticky-note"></i>
+                          Notes
+                        </h4>
+                        <p>{record.notes}</p>
+                      </div>
+                    )}
+                    
+                    {/* Add attachments section if there are any */}
+                    {record.attachments && record.attachments.length > 0 && (
+                      <div className="record-attachments">
+                        <h4>
+                          <i className="fas fa-paperclip"></i>
+                          Attachments
+                        </h4>
+                        {record.attachments.map((attachment, index) => (
+                          <div className="attachment-item" key={index}>
+                            <i className={`fas ${
+                              attachment.type === 'pdf' ? 'fa-file-pdf' :
+                              attachment.type === 'image' ? 'fa-file-image' :
+                              'fa-file'
+                            }`}></i>
+                            <span className="attachment-name">{attachment.name}</span>
+                            <button className="attachment-download">
+                              <i className="fas fa-download"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="record-footer">
+                    <span className="record-id">Record ID: {record.id}</span>
+                    <span className="created-date">
+                      <i className="fas fa-clock"></i> {' '}
+                      {new Date(record.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              // Timeline view
+              renderTimelineView()
+            )
+          ) : (
+            filteredRecords.length === 0 && recordSearchQuery ? (
+              <div className="empty-section">
+                <i className="fas fa-search"></i>
+                <h3>No Results Found</h3>
+                <p>No medical records match your search query "{recordSearchQuery}".</p>
+                <button 
+                  className="retry-button"
+                  onClick={() => setRecordSearchQuery('')}
+                >
+                  Clear Search
+                </button>
+              </div>
+            ) : filteredRecords.length === 0 && activeRecordFilter !== 'all' && !recordSearchQuery ? (
+              <div className="empty-section">
+                <i className="fas fa-filter"></i>
+                <h3>No {activeRecordFilter.replace('-', ' ')} records found</h3>
+                <p>There are no records in this category.</p>
+                <button 
+                  className="retry-button"
+                  onClick={() => setActiveRecordFilter('all')}
+                >
+                  Show All Records
+                </button>
+              </div>
+            ) : null
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-layout">
       <aside className="dashboard-sidebar">
@@ -436,6 +1138,14 @@ const PatientDashboard = () => {
           </button>
           
           <button 
+            className={`nav-item ${activeTab === 'find-doctors' ? 'active' : ''}`}
+            onClick={() => setActiveTab('find-doctors')}
+          >
+            <i className="fas fa-search nav-icon"></i>
+            Find Doctors
+          </button>
+          
+          <button 
             className={`nav-item ${activeTab === 'telemedicine' ? 'active' : ''}`}
             onClick={() => setActiveTab('telemedicine')}
           >
@@ -449,6 +1159,30 @@ const PatientDashboard = () => {
           >
             <i className="fas fa-history nav-icon"></i>
             Medical History
+          </button>
+
+          <button 
+            className={`nav-item ${activeTab === 'health-analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('health-analytics')}
+          >
+            <i className="fas fa-chart-line nav-icon"></i>
+            Health Analytics
+          </button>
+
+          <button 
+            className={`nav-item ${activeTab === 'medications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('medications')}
+          >
+            <i className="fas fa-pills nav-icon"></i>
+            Medications
+          </button>
+
+          <button 
+            className={`nav-item ${activeTab === 'documents' ? 'active' : ''}`}
+            onClick={() => setActiveTab('documents')}
+          >
+            <i className="fas fa-file-medical nav-icon"></i>
+            Documents
           </button>
 
           <button 
@@ -496,6 +1230,43 @@ const PatientDashboard = () => {
           </div>
         </div>
 
+        {showQuickActions && (
+          <div className="quick-actions-container">
+            <div className="quick-actions-header">
+              <h2>Quick Actions</h2>
+              <button className="toggle-quick-actions" onClick={() => setShowQuickActions(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="quick-actions-grid">
+              <div className="quick-action-card" onClick={() => setShowBookAppointmentModal(true)}>
+                <div className="quick-action-icon">
+                  <i className="fas fa-calendar-plus"></i>
+                </div>
+                <span>Book Appointment</span>
+              </div>
+              <div className="quick-action-card" onClick={() => setShowAddMedicationModal(true)}>
+                <div className="quick-action-icon">
+                  <i className="fas fa-pills"></i>
+                </div>
+                <span>Add Medication</span>
+              </div>
+              <div className="quick-action-card" onClick={() => setShowUploadDocumentModal(true)}>
+                <div className="quick-action-icon">
+                  <i className="fas fa-file-upload"></i>
+                </div>
+                <span>Upload Document</span>
+              </div>
+              <div className="quick-action-card" onClick={() => setActiveTab('telemedicine')}>
+                <div className="quick-action-icon">
+                  <i className="fas fa-video"></i>
+                </div>
+                <span>Start Telemedicine</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="tabs">
           <div className="tabs-list">
             <button 
@@ -503,6 +1274,12 @@ const PatientDashboard = () => {
               onClick={() => setActiveTab('appointments')}
             >
               Appointments
+            </button>
+            <button 
+              className={`tab-trigger ${activeTab === 'find-doctors' ? 'active' : ''}`}
+              onClick={() => setActiveTab('find-doctors')}
+            >
+              Find Doctors
             </button>
             <button 
               className={`tab-trigger ${activeTab === 'telemedicine' ? 'active' : ''}`}
@@ -515,6 +1292,24 @@ const PatientDashboard = () => {
               onClick={() => setActiveTab('history')}
             >
               Medical History
+            </button>
+            <button 
+              className={`tab-trigger ${activeTab === 'health-analytics' ? 'active' : ''}`}
+              onClick={() => setActiveTab('health-analytics')}
+            >
+              Health Analytics
+            </button>
+            <button 
+              className={`tab-trigger ${activeTab === 'medications' ? 'active' : ''}`}
+              onClick={() => setActiveTab('medications')}
+            >
+              Medications
+            </button>
+            <button 
+              className={`tab-trigger ${activeTab === 'documents' ? 'active' : ''}`}
+              onClick={() => setActiveTab('documents')}
+            >
+              Documents
             </button>
             <button 
               className={`tab-trigger ${activeTab === 'ai-recommendations' ? 'active' : ''}`}
@@ -566,6 +1361,17 @@ const PatientDashboard = () => {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'find-doctors' && (
+              <div className="card">
+                <div className="card-header">
+                  <h2>Find Doctors</h2>
+                </div>
+                <div className="card-content doctor-search-wrapper">
+                  <DoctorSearch />
                 </div>
               </div>
             )}
@@ -646,54 +1452,476 @@ const PatientDashboard = () => {
                   <h2>Medical History</h2>
                 </div>
                 <div className="card-content">
-                  <div className="medical-history">
-                    <div className="history-filters">
-                      <input 
-                        type="text" 
-                        placeholder="Search records..." 
-                        className="search-bar"
-                        value={recordSearchQuery}
-                        onChange={(e) => setRecordSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearchRecords()}
-                      />
-                      <button 
-                        className="search-btn"
-                        onClick={handleSearchRecords}
-                      >
+                  {renderMedicalRecords()}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'health-analytics' && (
+              <div className="card">
+                <div className="card-header">
+                  <h2>Health Analytics</h2>
+                  <button className="add-health-data-btn">
+                    <i className="fas fa-plus"></i> Add New Reading
+                  </button>
+                </div>
+                <div className="card-content">
+                  <div className="health-analytics-container">
+                    {/* Blood Pressure Chart */}
+                    <div className="health-chart-card">
+                      <div className="health-chart-header">
+                        <h3>Blood Pressure</h3>
+                        <div className="chart-options">
+                          <select className="time-range-selector">
+                            <option value="1m">Last Month</option>
+                            <option value="3m">Last 3 Months</option>
+                            <option value="6m">Last 6 Months</option>
+                            <option value="1y">Last Year</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="chart-container">
+                        <div className="chart-placeholder">
+                          <div className="bp-chart-bars">
+                            {healthAnalytics.bloodPressure.map((reading, index) => (
+                              <div key={index} className="bp-bar-group">
+                                <div 
+                                  className="bp-bar systolic" 
+                                  style={{height: `${reading.systolic}px`}}
+                                  title={`Systolic: ${reading.systolic} mmHg`}
+                                ></div>
+                                <div 
+                                  className="bp-bar diastolic" 
+                                  style={{height: `${reading.diastolic}px`}}
+                                  title={`Diastolic: ${reading.diastolic} mmHg`}
+                                ></div>
+                                <div className="bp-date">{new Date(reading.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="chart-legend">
+                            <div className="legend-item">
+                              <span className="legend-color systolic"></span>
+                              <span>Systolic</span>
+                            </div>
+                            <div className="legend-item">
+                              <span className="legend-color diastolic"></span>
+                              <span>Diastolic</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="chart-summary">
+                        <div className="summary-item">
+                          <div className="summary-value">120/80</div>
+                          <div className="summary-label">Latest Reading</div>
+                        </div>
+                        <div className="summary-item">
+                          <div className="summary-value">120/79</div>
+                          <div className="summary-label">Average</div>
+                        </div>
+                        <div className="summary-item trend-down">
+                          <div className="summary-value"><i className="fas fa-arrow-down"></i> 2%</div>
+                          <div className="summary-label">Trend</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Glucose Chart */}
+                    <div className="health-chart-card">
+                      <div className="health-chart-header">
+                        <h3>Blood Glucose</h3>
+                        <div className="chart-options">
+                          <select className="time-range-selector">
+                            <option value="1m">Last Month</option>
+                            <option value="3m">Last 3 Months</option>
+                            <option value="6m">Last 6 Months</option>
+                            <option value="1y">Last Year</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="chart-container">
+                        <div className="chart-placeholder">
+                          <div className="glucose-chart-line">
+                            <svg viewBox="0 0 300 150" preserveAspectRatio="none">
+                              <polyline
+                                points="0,80 100,83 200,82 300,79"
+                                fill="none"
+                                stroke="#3498db"
+                                strokeWidth="2"
+                              />
+                              {healthAnalytics.glucose.map((reading, index) => (
+                                <circle
+                                  key={index}
+                                  cx={index * 100}
+                                  cy={150 - reading.value}
+                                  r="4"
+                                  fill="#3498db"
+                                />
+                              ))}
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="chart-summary">
+                        <div className="summary-item">
+                          <div className="summary-value">96 mg/dL</div>
+                          <div className="summary-label">Latest Reading</div>
+                        </div>
+                        <div className="summary-item">
+                          <div className="summary-value">97 mg/dL</div>
+                          <div className="summary-label">Average</div>
+                        </div>
+                        <div className="summary-item trend-stable">
+                          <div className="summary-value"><i className="fas fa-equals"></i> 0%</div>
+                          <div className="summary-label">Trend</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Weight Chart */}
+                    <div className="health-chart-card">
+                      <div className="health-chart-header">
+                        <h3>Weight</h3>
+                        <div className="chart-options">
+                          <select className="time-range-selector">
+                            <option value="1m">Last Month</option>
+                            <option value="3m">Last 3 Months</option>
+                            <option value="6m">Last 6 Months</option>
+                            <option value="1y">Last Year</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="chart-container">
+                        <div className="chart-placeholder">
+                          <div className="weight-chart-area">
+                            <svg viewBox="0 0 300 150" preserveAspectRatio="none">
+                              <path
+                                d="M0,150 L0,80 L100,79 L200,78 L300,77 L300,150 Z"
+                                fill="rgba(46, 204, 113, 0.2)"
+                                stroke="#2ecc71"
+                                strokeWidth="2"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="chart-summary">
+                        <div className="summary-item">
+                          <div className="summary-value">68.5 kg</div>
+                          <div className="summary-label">Latest Reading</div>
+                        </div>
+                        <div className="summary-item">
+                          <div className="summary-value">69.3 kg</div>
+                          <div className="summary-label">Average</div>
+                        </div>
+                        <div className="summary-item trend-down">
+                          <div className="summary-value"><i className="fas fa-arrow-down"></i> 2%</div>
+                          <div className="summary-label">Trend</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'medications' && (
+              <div className="card">
+                <div className="card-header">
+                  <h2>Medications</h2>
+                  <button 
+                    className="add-medication-btn"
+                    onClick={() => setShowAddMedicationModal(true)}
+                  >
+                    <i className="fas fa-plus"></i> Add Medication
+                  </button>
+                </div>
+                <div className="card-content">
+                  <div className="medications-container">
+                    <div className="medications-header">
+                      <div className="medication-search">
                         <i className="fas fa-search"></i>
-                      </button>
+                        <input type="text" placeholder="Search medications..." />
+                      </div>
+                      <div className="medication-filter">
+                        <select className="medication-status-filter">
+                          <option value="all">All Medications</option>
+                          <option value="active">Active</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
                     </div>
                     
-                    {isLoadingRecords ? (
-                      <div className="loading-indicator">Loading medical records...</div>
-                    ) : medicalRecords.length > 0 ? (
-                      <div className="history-timeline">
-                        {medicalRecords.map(record => (
-                          <div className="history-item" key={record.id}>
-                            <div className="history-date">{new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                            <div className="history-content">
-                              <h4>{record.diagnosis}</h4>
-                              <p className="doctor-info">
-                                <i className="fas fa-user-md"></i> {record.doctorName}
-                              </p>
-                              <p className="record-type">
-                                <i className="fas fa-clipboard-list"></i> {record.type}
-                              </p>
-                              <p className="record-notes">
-                                <strong>Notes:</strong> {record.notes}
-                              </p>
-                              {record.prescriptions && record.prescriptions !== 'None' && (
-                                <p className="record-prescriptions">
-                                  <strong>Prescriptions:</strong> {record.prescriptions}
-                                </p>
+                    {medications.length > 0 ? (
+                      <div className="medications-list">
+                        {medications.map((medication, index) => (
+                          <div key={index} className="medication-card">
+                            <div className="medication-icon">
+                              <i className="fas fa-pills"></i>
+                            </div>
+                            <div className="medication-details">
+                              <h3 className="medication-name">{medication.name}</h3>
+                              <div className="medication-dosage">
+                                <i className="fas fa-prescription-bottle-alt"></i>
+                                <span>{medication.dosage}</span>
+                              </div>
+                              <div className="medication-frequency">
+                                <i className="fas fa-clock"></i>
+                                <span>{medication.frequency}</span>
+                              </div>
+                              <div className="medication-dates">
+                                <span className="start-date">
+                                  <i className="fas fa-calendar-day"></i>
+                                  Started: {new Date(medication.startDate).toLocaleDateString()}
+                                </span>
+                                {medication.endDate && (
+                                  <span className="end-date">
+                                    <i className="fas fa-calendar-check"></i>
+                                    Ends: {new Date(medication.endDate).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                              {medication.notes && (
+                                <div className="medication-notes">
+                                  <i className="fas fa-sticky-note"></i>
+                                  <span>{medication.notes}</span>
+                                </div>
                               )}
+                            </div>
+                            <div className="medication-actions">
+                              <button className="edit-medication-btn">
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button className="delete-medication-btn">
+                                <i className="fas fa-trash-alt"></i>
+                              </button>
+                              <div className="reminder-toggle">
+                                <label className="switch">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={medication.reminder}
+                                    onChange={() => {
+                                      // Toggle reminder logic
+                                    }}
+                                  />
+                                  <span className="slider round"></span>
+                                </label>
+                                <span>Reminder</span>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="no-data">
-                        <p>No medical records found.</p>
+                      <div className="no-medications">
+                        <div className="empty-state">
+                          <i className="fas fa-prescription-bottle empty-icon"></i>
+                          <h3>No medications added yet</h3>
+                          <p>Keep track of your medications by adding them here.</p>
+                          <button 
+                            className="add-first-medication-btn"
+                            onClick={() => setShowAddMedicationModal(true)}
+                          >
+                            Add Your First Medication
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="medication-reminders">
+                    <h3>Today's Medication Schedule</h3>
+                    <div className="reminder-timeline">
+                      <div className="timeline-slot morning">
+                        <div className="timeline-time">Morning</div>
+                        <div className="timeline-medications">
+                          <div className="timeline-medication">
+                            <i className="fas fa-prescription-bottle-alt"></i>
+                            <span>Vitamin D (1000 IU)</span>
+                            <span className="time-due">8:00 AM</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="timeline-slot afternoon">
+                        <div className="timeline-time">Afternoon</div>
+                        <div className="timeline-medications">
+                          <div className="timeline-medication">
+                            <i className="fas fa-prescription-bottle-alt"></i>
+                            <span>Ibuprofen (200mg)</span>
+                            <span className="time-due">12:00 PM</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="timeline-slot evening">
+                        <div className="timeline-time">Evening</div>
+                        <div className="timeline-medications">
+                          <div className="timeline-medication taken">
+                            <i className="fas fa-prescription-bottle-alt"></i>
+                            <span>Multivitamin</span>
+                            <span className="time-due">6:00 PM</span>
+                            <i className="fas fa-check-circle"></i>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="timeline-slot night">
+                        <div className="timeline-time">Night</div>
+                        <div className="timeline-medications">
+                          <div className="timeline-medication">
+                            <i className="fas fa-prescription-bottle-alt"></i>
+                            <span>Calcium (500mg)</span>
+                            <span className="time-due">9:00 PM</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <div className="card">
+                <div className="card-header">
+                  <h2>Documents</h2>
+                  <button 
+                    className="upload-document-btn"
+                    onClick={() => setShowUploadDocumentModal(true)}
+                  >
+                    <i className="fas fa-file-upload"></i> Upload Document
+                  </button>
+                </div>
+                <div className="card-content">
+                  <div className="documents-container">
+                    <div className="documents-header">
+                      <div className="document-search">
+                        <i className="fas fa-search"></i>
+                        <input type="text" placeholder="Search documents..." />
+                      </div>
+                      <div className="document-filters">
+                        <select className="document-type-filter">
+                          <option value="all">All Documents</option>
+                          <option value="lab_result">Lab Results</option>
+                          <option value="prescription">Prescriptions</option>
+                          <option value="imaging">Imaging Reports</option>
+                          <option value="insurance">Insurance</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <select className="document-sort">
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="name_asc">Name (A-Z)</option>
+                          <option value="name_desc">Name (Z-A)</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="document-categories">
+                      <div className="category-card active">
+                        <div className="category-icon">
+                          <i className="fas fa-file-medical"></i>
+                        </div>
+                        <div className="category-info">
+                          <div className="category-name">All</div>
+                          <div className="category-count">{documents.length}</div>
+                        </div>
+                      </div>
+                      <div className="category-card">
+                        <div className="category-icon">
+                          <i className="fas fa-flask"></i>
+                        </div>
+                        <div className="category-info">
+                          <div className="category-name">Lab Results</div>
+                          <div className="category-count">{documents.filter(doc => doc.type === 'lab_result').length}</div>
+                        </div>
+                      </div>
+                      <div className="category-card">
+                        <div className="category-icon">
+                          <i className="fas fa-file-prescription"></i>
+                        </div>
+                        <div className="category-info">
+                          <div className="category-name">Prescriptions</div>
+                          <div className="category-count">{documents.filter(doc => doc.type === 'prescription').length}</div>
+                        </div>
+                      </div>
+                      <div className="category-card">
+                        <div className="category-icon">
+                          <i className="fas fa-x-ray"></i>
+                        </div>
+                        <div className="category-info">
+                          <div className="category-name">Imaging</div>
+                          <div className="category-count">{documents.filter(doc => doc.type === 'imaging').length}</div>
+                        </div>
+                      </div>
+                      <div className="category-card">
+                        <div className="category-icon">
+                          <i className="fas fa-file-alt"></i>
+                        </div>
+                        <div className="category-info">
+                          <div className="category-name">Other</div>
+                          <div className="category-count">{documents.filter(doc => doc.type === 'other').length}</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {documents.length > 0 ? (
+                      <div className="documents-grid">
+                        {documents.map((document, index) => (
+                          <div key={index} className="document-card">
+                            <div className="document-preview">
+                              {document.type === 'imaging' ? (
+                                <img src={document.url} alt={document.title} className="document-thumbnail" />
+                              ) : (
+                                <div className="document-icon">
+                                  <i className={`fas ${
+                                    document.type === 'lab_result' ? 'fa-flask' : 
+                                    document.type === 'prescription' ? 'fa-file-prescription' :
+                                    document.type === 'insurance' ? 'fa-file-invoice-dollar' :
+                                    'fa-file-alt'
+                                  }`}></i>
+                                </div>
+                              )}
+                            </div>
+                            <div className="document-info">
+                              <h3 className="document-title">{document.title}</h3>
+                              <div className="document-meta">
+                                <span className="document-date">
+                                  <i className="fas fa-calendar-alt"></i>
+                                  {new Date(document.date).toLocaleDateString()}
+                                </span>
+                                <span className="document-type">
+                                  <i className="fas fa-tag"></i>
+                                  {document.type.replace('_', ' ').charAt(0).toUpperCase() + document.type.replace('_', ' ').slice(1)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="document-actions">
+                              <button className="view-document-btn">
+                                <i className="fas fa-eye"></i>
+                              </button>
+                              <button className="download-document-btn">
+                                <i className="fas fa-download"></i>
+                              </button>
+                              <button className="delete-document-btn">
+                                <i className="fas fa-trash-alt"></i>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="no-documents">
+                        <div className="empty-state">
+                          <i className="fas fa-file-medical empty-icon"></i>
+                          <h3>No documents uploaded yet</h3>
+                          <p>Upload your medical documents to keep them organized and accessible.</p>
+                          <button 
+                            className="upload-first-document-btn"
+                            onClick={() => setShowUploadDocumentModal(true)}
+                          >
+                            Upload Your First Document
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -845,29 +2073,54 @@ const PatientDashboard = () => {
                           </p>
                         </div>
                         <div className="review-actions">
-                          <div className="dropdown">
-                            <button className="write-review-btn">
-                              <i className="fas fa-plus"></i> Write a Review
-                              <i className="fas fa-chevron-down"></i>
-                            </button>
-                            <div className="dropdown-content">
-                              {pastDoctors.length > 0 ? (
-                                pastDoctors.map(doctor => (
-                                  <button 
-                                    key={doctor.id} 
-                                    className="dropdown-item"
-                                    onClick={() => handleOpenReviewModal(doctor)}
-                                  >
-                                    {doctor.name}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="dropdown-item disabled">
-                                  No doctors to review
-                                </div>
-                              )}
+                          <button 
+                            className="write-review-btn"
+                            onClick={() => setDropdownOpen(!dropdownOpen)}
+                          >
+                            <i className="fas fa-plus"></i> Write a Review
+                            <i className="fas fa-chevron-down"></i>
+                          </button>
+                          {dropdownOpen && (
+                            <div className="doctor-dropdown-menu" ref={dropdownRef}>
+                              <div className="doctor-dropdown-header">
+                                <h3>Select a doctor</h3>
+                                <button 
+                                  className="close-dropdown-btn"
+                                  onClick={() => setDropdownOpen(false)}
+                                >
+                                  <i className="fas fa-times"></i>
+                                </button>
+                              </div>
+                              <div className="doctor-list">
+                                {pastDoctors.length > 0 ? (
+                                  pastDoctors.map(doctor => (
+                                    <button 
+                                      key={doctor.id} 
+                                      className="doctor-item"
+                                      onClick={() => {
+                                        handleOpenReviewModal(doctor);
+                                        setDropdownOpen(false);
+                                      }}
+                                    >
+                                      <div className="doctor-avatar-small">
+                                        {doctor.name.charAt(0)}
+                                      </div>
+                                      <div className="doctor-info-small">
+                                        <span className="doctor-name">{doctor.name}</span>
+                                        <span className="doctor-specialty">{doctor.specialty || doctor.specialization || "General Medicine"}</span>
+                                      </div>
+                                      <i className="fas fa-chevron-right doctor-select-arrow"></i>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="no-doctors-message">
+                                    <i className="fas fa-user-md"></i>
+                                    <p>No doctors to review</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                       
@@ -1067,10 +2320,10 @@ const PatientDashboard = () => {
                 </div>
                 <div className="doctor-details">
                   <h4>{selectedDoctor.name}</h4>
-                  <p>{selectedDoctor.specialty}</p>
+                  <p>{selectedDoctor.specialty || selectedDoctor.specialization || "General Medicine"}</p>
                   <p className="last-visit">
                     <i className="fas fa-calendar-check"></i> 
-                    Last visit: {new Date(selectedDoctor.lastVisit).toLocaleDateString()}
+                    Last visit: {new Date(selectedDoctor.lastAppointmentDate || Date.now()).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -1139,6 +2392,248 @@ const PatientDashboard = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Medication Modal */}
+      {showAddMedicationModal && (
+        <div className="modal-overlay">
+          <div className="modal add-medication-modal">
+            <div className="modal-header">
+              <h3>Add New Medication</h3>
+              <button 
+                className="close-modal" 
+                onClick={() => setShowAddMedicationModal(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-content">
+              <form className="medication-form">
+                <div className="form-group">
+                  <label htmlFor="medication-name">Medication Name</label>
+                  <input 
+                    type="text"
+                    id="medication-name"
+                    placeholder="Enter medication name"
+                    value={medicationFormData.name}
+                    onChange={(e) => setMedicationFormData({...medicationFormData, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="medication-dosage">Dosage</label>
+                    <input 
+                      type="text"
+                      id="medication-dosage"
+                      placeholder="e.g., 500mg"
+                      value={medicationFormData.dosage}
+                      onChange={(e) => setMedicationFormData({...medicationFormData, dosage: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="medication-frequency">Frequency</label>
+                    <input 
+                      type="text"
+                      id="medication-frequency"
+                      placeholder="e.g., Once daily"
+                      value={medicationFormData.frequency}
+                      onChange={(e) => setMedicationFormData({...medicationFormData, frequency: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="medication-start-date">Start Date</label>
+                    <input 
+                      type="date"
+                      id="medication-start-date"
+                      value={medicationFormData.startDate}
+                      onChange={(e) => setMedicationFormData({...medicationFormData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="medication-end-date">End Date (Optional)</label>
+                    <input 
+                      type="date"
+                      id="medication-end-date"
+                      value={medicationFormData.endDate}
+                      onChange={(e) => setMedicationFormData({...medicationFormData, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="medication-notes">Notes (Optional)</label>
+                  <textarea 
+                    id="medication-notes"
+                    placeholder="Enter any additional information about this medication"
+                    value={medicationFormData.notes}
+                    onChange={(e) => setMedicationFormData({...medicationFormData, notes: e.target.value})}
+                  ></textarea>
+                </div>
+                <div className="form-group reminder-toggle-group">
+                  <label className="toggle-label">
+                    Set Reminders
+                    <div className="toggle-switch">
+                      <input 
+                        type="checkbox" 
+                        id="medication-reminder"
+                        checked={medicationFormData.reminder}
+                        onChange={(e) => setMedicationFormData({...medicationFormData, reminder: e.target.checked})}
+                      />
+                      <span className="toggle-slider"></span>
+                    </div>
+                  </label>
+                  <p className="form-help-text">You'll receive notifications when it's time to take this medication</p>
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="cancel-btn"
+                onClick={() => setShowAddMedicationModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="save-btn"
+                onClick={() => {
+                  // Add logic to save medication
+                  const newMedication = {...medicationFormData, id: Date.now()};
+                  setMedications([...medications, newMedication]);
+                  setShowAddMedicationModal(false);
+                }}
+              >
+                Save Medication
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Document Modal */}
+      {showUploadDocumentModal && (
+        <div className="modal-overlay">
+          <div className="modal upload-document-modal">
+            <div className="modal-header">
+              <h3>Upload Document</h3>
+              <button 
+                className="close-modal" 
+                onClick={() => setShowUploadDocumentModal(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-content">
+              <form className="document-upload-form">
+                <div className="form-group">
+                  <label htmlFor="document-title">Document Title</label>
+                  <input 
+                    type="text"
+                    id="document-title"
+                    placeholder="Enter document title"
+                    value={documentFormData.title}
+                    onChange={(e) => setDocumentFormData({...documentFormData, title: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="document-type">Document Type</label>
+                  <select 
+                    id="document-type"
+                    value={documentFormData.type}
+                    onChange={(e) => setDocumentFormData({...documentFormData, type: e.target.value})}
+                  >
+                    <option value="lab_result">Lab Result</option>
+                    <option value="prescription">Prescription</option>
+                    <option value="imaging">Imaging Report</option>
+                    <option value="insurance">Insurance Document</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="document-date">Document Date</label>
+                  <input 
+                    type="date"
+                    id="document-date"
+                    value={documentFormData.date}
+                    onChange={(e) => setDocumentFormData({...documentFormData, date: e.target.value})}
+                  />
+                </div>
+                <div className="form-group file-upload-group">
+                  <label htmlFor="document-file">Upload File</label>
+                  <div className="file-upload-area">
+                    <input 
+                      type="file"
+                      id="document-file"
+                      className="file-input"
+                      onChange={(e) => setDocumentFormData({...documentFormData, file: e.target.files[0]})}
+                    />
+                    <div className="file-upload-placeholder">
+                      <i className="fas fa-cloud-upload-alt"></i>
+                      <p>Drag and drop files here or click to browse</p>
+                      <span>Supported formats: PDF, JPG, PNG (max 10MB)</span>
+                    </div>
+                    {documentFormData.file && (
+                      <div className="file-preview">
+                        <i className="fas fa-file-alt"></i>
+                        <span className="file-name">{documentFormData.file.name}</span>
+                        <button 
+                          className="remove-file"
+                          onClick={() => setDocumentFormData({...documentFormData, file: null})}
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="cancel-btn"
+                onClick={() => setShowUploadDocumentModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`upload-btn ${isUploadingDocument ? 'loading' : ''}`}
+                disabled={!documentFormData.title || !documentFormData.date || !documentFormData.file}
+                onClick={() => {
+                  // Add logic to upload document
+                  setIsUploadingDocument(true);
+                  setTimeout(() => {
+                    const newDocument = {
+                      id: Date.now(),
+                      title: documentFormData.title,
+                      type: documentFormData.type,
+                      date: documentFormData.date,
+                      url: URL.createObjectURL(documentFormData.file),
+                      fileName: documentFormData.file.name,
+                      uploadDate: new Date().toISOString()
+                    };
+                    setDocuments([...documents, newDocument]);
+                    setIsUploadingDocument(false);
+                    setShowUploadDocumentModal(false);
+                  }, 1500);
+                }}
+              >
+                {isUploadingDocument ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-cloud-upload-alt"></i>
+                    Upload Document
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

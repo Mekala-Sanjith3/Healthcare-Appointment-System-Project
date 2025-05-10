@@ -169,7 +169,162 @@ const mockDb = {
         
         localStorage.setItem('mockPatients', JSON.stringify(filteredPatients));
         return true;
-    }
+    },
+    
+    // Add sample doctor data if none exists
+    initializeDoctorsMockData: () => {
+        const doctors = JSON.parse(localStorage.getItem('mockDoctors') || '[]');
+        
+        if (doctors.length === 0) {
+            const sampleDoctors = [
+                {
+                    id: 'doctor_1',
+                    name: 'Dr. Sarah Johnson',
+                    first_name: 'Sarah',
+                    last_name: 'Johnson',
+                    email: 'sarah.johnson@healthcare.com',
+                    specialty: 'Cardiology',
+                    specialization: 'Cardiology',
+                    qualification: 'MD, Cardiology',
+                    experience: '14 years',
+                    clinic_address: '123 Medical Center, New York, NY',
+                    status: 'ACTIVE',
+                    phone_number: '555-123-4567',
+                    profile_picture: null,
+                    role: 'DOCTOR',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'doctor_2',
+                    name: 'Dr. Michael Chen',
+                    first_name: 'Michael',
+                    last_name: 'Chen',
+                    email: 'michael.chen@healthcare.com',
+                    specialty: 'Dermatology',
+                    specialization: 'Dermatology',
+                    qualification: 'MD, Dermatology',
+                    experience: '8 years',
+                    clinic_address: '456 Health Plaza, Los Angeles, CA',
+                    status: 'ACTIVE',
+                    phone_number: '555-987-6543',
+                    profile_picture: null,
+                    role: 'DOCTOR',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'doctor_3',
+                    name: 'Dr. Emily Rogers',
+                    first_name: 'Emily',
+                    last_name: 'Rogers',
+                    email: 'emily.rogers@healthcare.com',
+                    specialty: 'Neurology',
+                    specialization: 'Neurology',
+                    qualification: 'MD, Neurology, PhD',
+                    experience: '12 years',
+                    clinic_address: '789 Brain Center, Chicago, IL',
+                    status: 'ACTIVE',
+                    phone_number: '555-456-7890',
+                    profile_picture: null,
+                    role: 'DOCTOR',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'doctor_4',
+                    name: 'Dr. James Wilson',
+                    first_name: 'James',
+                    last_name: 'Wilson',
+                    email: 'james.wilson@healthcare.com',
+                    specialty: 'Orthopedics',
+                    specialization: 'Orthopedics',
+                    qualification: 'MD, Orthopedic Surgery',
+                    experience: '15 years',
+                    clinic_address: '567 Bone & Joint Institute, Boston, MA',
+                    status: 'ACTIVE',
+                    phone_number: '555-789-0123',
+                    profile_picture: null,
+                    role: 'DOCTOR',
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'doctor_5',
+                    name: 'Dr. Sophia Martinez',
+                    first_name: 'Sophia',
+                    last_name: 'Martinez',
+                    email: 'sophia.martinez@healthcare.com',
+                    specialty: 'Pediatrics',
+                    specialization: 'Pediatrics',
+                    qualification: 'MD, Pediatrics',
+                    experience: '10 years',
+                    clinic_address: '890 Children\'s Health Center, Miami, FL',
+                    status: 'ACTIVE',
+                    phone_number: '555-234-5678',
+                    profile_picture: null,
+                    role: 'DOCTOR',
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            
+            localStorage.setItem('mockDoctors', JSON.stringify(sampleDoctors));
+            return sampleDoctors;
+        }
+        
+        return doctors;
+    },
+    
+    searchDoctors: (query, options = {}) => {
+        const doctors = mockDb.initializeDoctorsMockData();
+        let filtered = [...doctors];
+        
+        // Filter by name
+        if (query && query.trim() !== '') {
+            const searchTerm = query.toLowerCase();
+            filtered = filtered.filter(doc => 
+                doc.name.toLowerCase().includes(searchTerm) || 
+                doc.first_name.toLowerCase().includes(searchTerm) || 
+                doc.last_name.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        // Filter by specialty/specialization
+        if (options.specialty && options.specialty.trim() !== '') {
+            const specialty = options.specialty.toLowerCase();
+            filtered = filtered.filter(doc => 
+                (doc.specialty && doc.specialty.toLowerCase().includes(specialty)) || 
+                (doc.specialization && doc.specialization.toLowerCase().includes(specialty))
+            );
+        }
+        
+        // Filter by location
+        if (options.location && options.location.trim() !== '') {
+            const location = options.location.toLowerCase();
+            filtered = filtered.filter(doc => 
+                doc.clinic_address && doc.clinic_address.toLowerCase().includes(location)
+            );
+        }
+        
+        // Filter by availability date (we would need to add availability data to mock doctors)
+        if (options.availableDate) {
+            // Mock implementation for available date filter
+            // In a real app, we would check the doctor's schedule here
+        }
+        
+        // Basic pagination
+        const page = options.page || 1;
+        const limit = options.limit || 10;
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        const paginatedResults = filtered.slice(start, end);
+        
+        return {
+            data: paginatedResults,
+            meta: {
+                total: filtered.length,
+                page: page,
+                limit: limit,
+                totalPages: Math.ceil(filtered.length / limit)
+            }
+        };
+    },
 };
 
 // Common headers for API requests
@@ -379,9 +534,42 @@ export const doctorApi = {
             return await handleResponse(response);
         } catch (error) {
             console.error('Failed to fetch doctors:', error.message);
-            // Fall back to mock implementation for development
-            console.log('Using mock implementation for doctors');
-            return mockDb.getAllDoctors();
+            // Make sure to initialize mock data
+            return mockDb.initializeDoctorsMockData();
+        }
+    },
+    
+    // Add new method to search doctors with filters
+    getDoctorsWithFilters: async (filters = {}) => {
+        try {
+            // Build the search URL with query parameters
+            const params = new URLSearchParams();
+            
+            if (filters.name) params.append('name', filters.name);
+            if (filters.specialty) params.append('specialty', filters.specialty);
+            if (filters.location) params.append('location', filters.location);
+            if (filters.availableDate) params.append('availableDate', filters.availableDate);
+            if (filters.page) params.append('page', filters.page);
+            if (filters.limit) params.append('limit', filters.limit);
+            
+            const searchUrl = `${API_BASE_URL}/doctors?${params.toString()}`;
+            
+            const response = await fetch(searchUrl, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error('Failed to fetch doctors with filters:', error.message);
+            
+            // Fall back to mock implementation
+            return mockDb.searchDoctors(filters.name, {
+                specialty: filters.specialty,
+                location: filters.location,
+                availableDate: filters.availableDate,
+                page: filters.page,
+                limit: filters.limit
+            });
         }
     },
     
@@ -852,60 +1040,225 @@ export const appointmentApi = {
                 headers: getHeaders()
             });
             
-            return await handleResponse(response);
+            const appointments = await handleResponse(response);
+            
+            // Ensure consistent field naming for frontend components
+            return appointments.map(appointment => ({
+                id: appointment.id,
+                patientId: appointment.patient_id,
+                patientName: appointment.patient_name,
+                doctorId: appointment.doctor_id,
+                doctorName: appointment.doctor_name,
+                appointmentDate: appointment.date,
+                appointmentTime: appointment.time,
+                appointmentType: appointment.type,
+                status: appointment.status,
+                notes: appointment.notes,
+                problem: appointment.notes?.split('Problem:')[1]?.split('\n\n')[0]?.trim() || '',
+                createdAt: appointment.created_at
+            }));
         } catch (error) {
             console.error(`Failed to fetch appointments for doctor ${doctorId}:`, error.message);
             // Fall back to mock implementation for development
+            console.log('Using mock implementation for doctor appointments');
+            
+            // Get all appointments from localStorage
             const allAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-            return allAppointments.filter(appointment => appointment.doctorId === doctorId);
+            
+            // Filter to get only this doctor's appointments and deduplicate based on ID
+            const appointmentMap = new Map();
+            allAppointments.forEach(appointment => {
+                if ((appointment.doctorId === doctorId || appointment.doctor_id === doctorId) && !appointmentMap.has(appointment.id)) {
+                    appointmentMap.set(appointment.id, appointment);
+                }
+            });
+            
+            return Array.from(appointmentMap.values());
         }
     },
     
     getAppointmentsByPatientId: async (patientId) => {
         try {
+            console.log(`Fetching appointments for patient ID: ${patientId}`);
             const response = await fetch(`${API_BASE_URL}/appointments/patient/${patientId}`, {
                 headers: getHeaders()
             });
             
-            return await handleResponse(response);
+            if (!response.ok) {
+                console.error(`Error response from server: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch appointments: ${response.statusText}`);
+            }
+            
+            const appointments = await response.json();
+            console.log(`Successfully retrieved ${appointments.length} appointments for patient ${patientId}`);
+            
+            // Ensure consistent field naming for frontend components
+            const formattedAppointments = appointments.map(appointment => ({
+                id: appointment.id,
+                patientId: appointment.patient_id,
+                patientName: appointment.patient_name || '',
+                doctorId: appointment.doctor_id,
+                doctorName: appointment.doctor_name || '',
+                doctorSpecialty: appointment.specialty || '',
+                appointmentDate: appointment.date,
+                appointmentTime: appointment.time,
+                appointmentType: appointment.type,
+                status: appointment.status,
+                notes: appointment.notes,
+                problem: appointment.notes?.split('Problem:')[1]?.split('\n\n')[0]?.trim() || '',
+                createdAt: appointment.created_at
+            }));
+            
+            // Store in localStorage as a cache/backup
+            localStorage.setItem(`patient_${patientId}_appointments`, JSON.stringify(formattedAppointments));
+            
+            return formattedAppointments;
         } catch (error) {
             console.error(`Failed to fetch appointments for patient ${patientId}:`, error.message);
+            
+            // Try to get cached appointments from localStorage first
+            const cachedAppointments = localStorage.getItem(`patient_${patientId}_appointments`);
+            if (cachedAppointments) {
+                console.log(`Retrieved ${JSON.parse(cachedAppointments).length} cached appointments from localStorage`);
+                return JSON.parse(cachedAppointments);
+            }
+            
             // Fall back to mock implementation for development
             console.log('Using mock implementation for patient appointments');
             const allAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-            return allAppointments.filter(appointment => appointment.patientId === patientId);
+            
+            // Filter to get only this patient's appointments and deduplicate based on ID
+            const appointmentMap = new Map();
+            allAppointments.forEach(appointment => {
+                if ((appointment.patientId === patientId || appointment.patient_id === patientId) && !appointmentMap.has(appointment.id)) {
+                    appointmentMap.set(appointment.id, appointment);
+                }
+            });
+            
+            const patientAppointments = Array.from(appointmentMap.values());
+            
+            // Cache these appointments too
+            localStorage.setItem(`patient_${patientId}_appointments`, JSON.stringify(patientAppointments));
+            
+            return patientAppointments;
         }
     },
     
     createAppointment: async (appointmentData) => {
         try {
+            console.log('Creating appointment with data:', appointmentData);
+            
+            // Format the appointment data to match backend expectations
+            const formattedData = {
+                patientId: appointmentData.patientId,
+                doctorId: appointmentData.doctorId,
+                appointmentDate: appointmentData.appointmentDate,
+                appointmentTime: appointmentData.appointmentTime,
+                appointmentType: appointmentData.appointmentType,
+                status: 'PENDING',
+                notes: `Problem: ${appointmentData.problem}${appointmentData.notes ? '\n\nAdditional notes: ' + appointmentData.notes : ''}`,
+                doctorName: appointmentData.doctorName,
+                doctorSpecialization: appointmentData.doctorSpecialization,
+                patientName: appointmentData.patientName,
+                patientDetails: appointmentData.patientDetails
+            };
+            
+            // Send to the backend API endpoint
             const response = await fetch(`${API_BASE_URL}/appointments`, {
                 method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(appointmentData)
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(formattedData)
             });
             
-            return await handleResponse(response);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Appointment creation failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData
+                });
+                throw new Error(errorData.message || 'Failed to create appointment');
+            }
+            
+            const responseData = await response.json();
+            console.log('Appointment created successfully:', responseData);
+            
+            // Format response to match frontend expectations
+            const formattedAppointment = {
+                id: responseData.id || `app_${Date.now()}`,
+                patientId: responseData.patientId || formattedData.patientId,
+                patientName: responseData.patientName || formattedData.patientName,
+                doctorId: responseData.doctorId || formattedData.doctorId,
+                doctorName: responseData.doctorName || formattedData.doctorName,
+                doctorSpecialization: responseData.doctorSpecialization || formattedData.doctorSpecialization,
+                appointmentDate: responseData.appointmentDate || formattedData.appointmentDate,
+                appointmentTime: responseData.appointmentTime || formattedData.appointmentTime,
+                appointmentType: responseData.appointmentType || formattedData.appointmentType,
+                status: responseData.status || 'PENDING',
+                notes: responseData.notes || formattedData.notes,
+                problem: appointmentData.problem,
+                patientDetails: appointmentData.patientDetails,
+                createdAt: responseData.createdAt || new Date().toISOString()
+            };
+            
+            // Update localStorage for both doctor and patient views
+            const currentAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
+            
+            // Remove any potential duplicates with the same ID
+            const filteredAppointments = currentAppointments.filter(app => app.id !== formattedAppointment.id);
+            
+            // Add the new appointment
+            filteredAppointments.push(formattedAppointment);
+            localStorage.setItem('mockAppointments', JSON.stringify(filteredAppointments));
+            
+            // Update patient-specific appointment cache
+            const patientId = formattedAppointment.patientId;
+            const patientAppointments = JSON.parse(localStorage.getItem(`patient_${patientId}_appointments`) || '[]');
+            const filteredPatientAppointments = patientAppointments.filter(app => app.id !== formattedAppointment.id);
+            filteredPatientAppointments.push(formattedAppointment);
+            localStorage.setItem(`patient_${patientId}_appointments`, JSON.stringify(filteredPatientAppointments));
+            
+            return formattedAppointment;
         } catch (error) {
-            console.error('Failed to create appointment:', error.message);
+            console.error('Failed to create appointment:', error);
+            
             // Fall back to mock implementation for development
-            console.log('Using mock implementation for creating appointment');
+            console.log('Using mock implementation for appointment creation');
             
-            // Get current appointments
-            const appointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-            
-            // Create new appointment with an ID
-            const newAppointment = {
+            const mockAppointment = {
+                id: `app_${Date.now()}`,
                 ...appointmentData,
-                id: 'appointment_' + Date.now(),
+                status: 'PENDING',
                 createdAt: new Date().toISOString()
             };
             
-            // Add to appointments and save
-            appointments.push(newAppointment);
-            localStorage.setItem('mockAppointments', JSON.stringify(appointments));
+            // Store in localStorage - make sure we don't create duplicates
+            const currentAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
+            const filteredAppointments = currentAppointments.filter(app => 
+                !(app.patientId === mockAppointment.patientId && 
+                   app.doctorId === mockAppointment.doctorId && 
+                   app.appointmentDate === mockAppointment.appointmentDate && 
+                   app.appointmentTime === mockAppointment.appointmentTime)
+            );
+            filteredAppointments.push(mockAppointment);
+            localStorage.setItem('mockAppointments', JSON.stringify(filteredAppointments));
             
-            return newAppointment;
+            // Also update patient-specific appointment cache
+            const patientId = mockAppointment.patientId;
+            const patientAppointments = JSON.parse(localStorage.getItem(`patient_${patientId}_appointments`) || '[]');
+            const filteredPatientAppointments = patientAppointments.filter(app => 
+                !(app.patientId === mockAppointment.patientId && 
+                   app.doctorId === mockAppointment.doctorId && 
+                   app.appointmentDate === mockAppointment.appointmentDate && 
+                   app.appointmentTime === mockAppointment.appointmentTime)
+            );
+            filteredPatientAppointments.push(mockAppointment);
+            localStorage.setItem(`patient_${patientId}_appointments`, JSON.stringify(filteredPatientAppointments));
+            
+            return mockAppointment;
         }
     },
     
@@ -1380,49 +1733,134 @@ export const DoctorProfileModel = {
 export const medicalRecordsApi = {
     getPatientMedicalHistory: async (patientId) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}`, {
-                headers: getHeaders()
-            });
+            // Log the request
+            console.log(`Fetching medical records for patient ${patientId}`);
             
-            return await handleResponse(response);
-        } catch (error) {
-            console.error(`Failed to fetch medical records for patient ${patientId}:`, error.message);
-            // Return mock data for development
-            return [
+            // Ensure the API URL is correct - try both potential endpoints
+            let response;
+            try {
+                // First try the endpoint from Java backend
+                response = await fetch(`${API_BASE_URL}/patients/${patientId}/medical-records`, {
+                    headers: getHeaders(),
+                    method: 'GET'
+                });
+                
+                if (!response.ok) {
+                    // If that doesn't work, try the alternative endpoint
+                    response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}`, {
+                        headers: getHeaders(),
+                        method: 'GET'
+                    });
+                }
+            } catch (fetchError) {
+                console.error("Error fetching from primary endpoint:", fetchError);
+                // Try the alternate endpoint
+                response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}`, {
+                    headers: getHeaders(),
+                    method: 'GET'
+                });
+            }
+            
+            // Handle the response
+            if (!response.ok) {
+                console.error(`Error fetching medical records: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch medical records: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log(`Successfully fetched ${data.length} medical records for patient ${patientId}`, data);
+            
+            // If we have data, use it
+            if (data && Array.isArray(data) && data.length > 0) {
+                // Store in localStorage as a cache for offline use
+                localStorage.setItem(`patient_${patientId}_medicalRecords`, JSON.stringify(data));
+                return data;
+            }
+            
+            // Check for patient-specific records in localStorage as a fallback
+            const storedRecords = localStorage.getItem(`patient_${patientId}_medicalRecords`);
+            if (storedRecords) {
+                console.log(`Found ${JSON.parse(storedRecords).length} cached medical records for patient ${patientId}`);
+                return JSON.parse(storedRecords);
+            }
+            
+            // Create mock data if no records exist (helps with development)
+            console.log("No medical records found. Creating mock data for development.");
+            const mockRecords = [
                 {
-                    id: 'med_1',
+                    id: `med_${Date.now()}_1`,
                     patientId: patientId,
-                    doctorId: 'doc_1',
-                    doctorName: 'Dr. John Smith',
-                    date: '2024-03-10',
-                    diagnosis: 'General Checkup',
-                    notes: 'Blood pressure: 120/80, Weight: 70kg, All vitals normal',
-                    prescriptions: 'None',
-                    type: 'Checkup'
+                    patient_id: patientId,
+                    doctorName: "Dr. Sarah Johnson",
+                    doctor_name: "Dr. Sarah Johnson",
+                    specialty: "Cardiology",
+                    diagnosis: "Annual Checkup",
+                    description: "Regular checkup shows all vitals are normal. Blood pressure is 120/80.",
+                    prescription: "Vitamin D supplement recommended",
+                    prescriptions: "Vitamin D supplement recommended",
+                    treatment_plan: "Continue with regular exercise and balanced diet",
+                    treatmentPlan: "Continue with regular exercise and balanced diet",
+                    notes: "Follow up in 12 months",
+                    date: new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0], // 30 days ago
+                    createdAt: new Date(Date.now() - 30*24*60*60*1000).toISOString()
                 },
                 {
-                    id: 'med_2',
+                    id: `med_${Date.now()}_2`,
                     patientId: patientId,
-                    doctorId: 'doc_2',
-                    doctorName: 'Dr. Lisa Johnson',
-                    date: '2024-02-15',
-                    diagnosis: 'Dental Examination',
-                    notes: 'Routine cleaning and checkup. Minor cavity detected in lower right molar',
-                    prescriptions: 'None',
-                    type: 'Dental'
-                },
-                {
-                    id: 'med_3',
-                    patientId: patientId,
-                    doctorId: 'doc_1',
-                    doctorName: 'Dr. John Smith',
-                    date: '2024-01-05',
-                    diagnosis: 'Annual Physical',
-                    notes: 'Blood pressure: 118/75, Weight: 71kg, Cholesterol: 180 mg/dL, Blood sugar (fasting): 85 mg/dL. All tests within normal range.',
-                    prescriptions: 'None',
-                    type: 'Annual Physical'
+                    patient_id: patientId,
+                    doctorName: "Dr. Michael Chen",
+                    doctor_name: "Dr. Michael Chen",
+                    specialty: "General Medicine",
+                    diagnosis: "Common Cold",
+                    description: "Patient presented with mild cough and congestion",
+                    prescription: "Over-the-counter cough syrup and decongestant",
+                    prescriptions: "Over-the-counter cough syrup and decongestant",
+                    treatment_plan: "Rest and increase fluid intake",
+                    treatmentPlan: "Rest and increase fluid intake",
+                    notes: "Symptoms should resolve within a week",
+                    date: new Date(Date.now() - 60*24*60*60*1000).toISOString().split('T')[0], // 60 days ago
+                    createdAt: new Date(Date.now() - 60*24*60*60*1000).toISOString()
                 }
             ];
+            
+            // Store these mock records in localStorage
+            localStorage.setItem(`patient_${patientId}_medicalRecords`, JSON.stringify(mockRecords));
+            return mockRecords;
+        } catch (error) {
+            console.error(`Failed to fetch medical records for patient ${patientId}:`, error.message);
+            
+            // Check for patient-specific records in localStorage as a fallback
+            const storedRecords = localStorage.getItem(`patient_${patientId}_medicalRecords`);
+            if (storedRecords) {
+                console.log(`Found ${JSON.parse(storedRecords).length} cached medical records for patient ${patientId}`);
+                return JSON.parse(storedRecords);
+            }
+            
+            // Create mock data if no records exist (helps with development)
+            console.log("No medical records found after error. Creating mock data for development.");
+            const mockRecords = [
+                {
+                    id: `med_${Date.now()}_1`,
+                    patientId: patientId,
+                    patient_id: patientId,
+                    doctorName: "Dr. Sarah Johnson",
+                    doctor_name: "Dr. Sarah Johnson",
+                    specialty: "Cardiology",
+                    diagnosis: "Annual Checkup",
+                    description: "Regular checkup shows all vitals are normal. Blood pressure is 120/80.",
+                    prescription: "Vitamin D supplement recommended",
+                    prescriptions: "Vitamin D supplement recommended",
+                    treatment_plan: "Continue with regular exercise and balanced diet",
+                    treatmentPlan: "Continue with regular exercise and balanced diet",
+                    notes: "Follow up in 12 months",
+                    date: new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0], // 30 days ago
+                    createdAt: new Date(Date.now() - 30*24*60*60*1000).toISOString()
+                }
+            ];
+            
+            // Store these mock records in localStorage
+            localStorage.setItem(`patient_${patientId}_medicalRecords`, JSON.stringify(mockRecords));
+            return mockRecords;
         }
     },
     
@@ -1467,12 +1905,64 @@ export const medicalRecordsApi = {
             return await handleResponse(response);
         } catch (error) {
             console.error('Failed to add medical record:', error.message);
-            // Return mock response for development
-            return {
-                ...medicalRecordData,
+            // Create a consistent formatted medical record
+            const newRecord = {
                 id: `med_${Date.now()}`,
+                patientId: medicalRecordData.patient_id,
+                patient_id: medicalRecordData.patient_id, // Add both formats for compatibility
+                doctorId: medicalRecordData.doctor_id,
+                doctor_id: medicalRecordData.doctor_id, // Add both formats for compatibility
+                doctorName: medicalRecordData.doctor_name || "Dr. Unknown",
+                doctor_name: medicalRecordData.doctor_name || "Dr. Unknown", // Add both formats
+                specialty: medicalRecordData.specialty || "General",
+                diagnosis: medicalRecordData.diagnosis,
+                description: medicalRecordData.description,
+                prescription: medicalRecordData.prescription,
+                prescriptions: medicalRecordData.prescription, // Add both formats for compatibility
+                treatment_plan: medicalRecordData.treatment_plan,
+                treatmentPlan: medicalRecordData.treatment_plan, // Add both formats
+                notes: medicalRecordData.notes,
+                date: new Date().toISOString().split('T')[0],
                 createdAt: new Date().toISOString()
             };
+            
+            // Store in localStorage for patients to view
+            const patientId = medicalRecordData.patient_id;
+            const existingRecords = JSON.parse(localStorage.getItem(`patient_${patientId}_medicalRecords`) || '[]');
+            existingRecords.push(newRecord);
+            localStorage.setItem(`patient_${patientId}_medicalRecords`, JSON.stringify(existingRecords));
+            
+            console.log(`Medical record saved to localStorage for patient ${patientId}`, newRecord);
+            
+            return newRecord;
+        }
+    },
+    
+    // Debug helper for localStorage
+    debugLocalStorage: (patientId) => {
+        try {
+            // Log all localStorage keys
+            console.log("All localStorage keys:");
+            for (let i = 0; i < localStorage.length; i++) {
+                console.log(`  ${i}: ${localStorage.key(i)}`);
+            }
+            
+            // Check for patient medical records
+            const recordKey = `patient_${patientId}_medicalRecords`;
+            const storedRecords = localStorage.getItem(recordKey);
+            
+            if (storedRecords) {
+                const records = JSON.parse(storedRecords);
+                console.log(`Found ${records.length} records for patient ${patientId} in localStorage`);
+                console.log("Records:", records);
+                return records;
+            } else {
+                console.log(`No records found in localStorage for key "${recordKey}"`);
+                return null;
+            }
+        } catch (error) {
+            console.error("Error debugging localStorage:", error);
+            return null;
         }
     }
 };
@@ -1666,35 +2156,60 @@ export const reviewsApi = {
         } catch (error) {
             console.error(`Failed to fetch past doctors for patient ${patientId}:`, error.message);
             
-            // Create mock data for past doctors
-            return [
-                {
-                    id: 'doctor_1',
-                    name: 'Dr. Sarah Johnson',
-                    specialty: 'Cardiology',
-                    lastAppointmentDate: '2024-04-01T10:00:00Z'
-                },
-                {
-                    id: 'doctor_2',
-                    name: 'Dr. Michael Chen',
-                    specialty: 'Dermatology',
-                    lastAppointmentDate: '2024-03-10T09:15:00Z'
-                },
-                {
-                    id: 'doctor_3',
-                    name: 'Dr. Emily Wilson',
-                    specialty: 'Neurology',
-                    lastAppointmentDate: '2024-02-22T14:30:00Z'
-                },
-                {
-                    id: 'doctor_4',
-                    name: 'Dr. James Rodriguez',
-                    specialty: 'Orthopedics',
-                    lastAppointmentDate: '2024-01-15T11:00:00Z'
-                }
-            ];
+            // Get doctors from the actual system database
+            const systemDoctors = mockDb.initializeDoctorsMockData();
+            
+            // Map the doctors to the format needed for the reviews dropdown
+            return systemDoctors.map(doctor => ({
+                id: doctor.id,
+                name: doctor.name,
+                specialty: doctor.specialty || doctor.specialization,
+                lastAppointmentDate: new Date().toISOString() // Use current date as mock last appointment
+            }));
         }
     }
 };
 
-// ... other API functions like medical records, etc. 
+// Add notification API functions
+export const notificationApi = {
+    getUserNotifications: async (userId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/appointments/notifications/${userId}`, {
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to fetch notifications for user ${userId}:`, error.message);
+            // Fall back to mock implementation for development
+            console.log('Using mock implementation for user notifications');
+            return [];
+        }
+    },
+    
+    markNotificationAsRead: async (notificationId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/appointments/notifications/${notificationId}/read`, {
+                method: 'PUT',
+                headers: getHeaders()
+            });
+            
+            return await handleResponse(response);
+        } catch (error) {
+            console.error(`Failed to mark notification ${notificationId} as read:`, error.message);
+            // Fall back to mock implementation for development
+            console.log('Using mock implementation for marking notification as read');
+            return { success: true };
+        }
+    },
+    
+    getUnreadCount: async (userId) => {
+        try {
+            const notifications = await notificationApi.getUserNotifications(userId);
+            return notifications.filter(notification => !notification.is_read).length;
+        } catch (error) {
+            console.error(`Failed to get unread count for user ${userId}:`, error.message);
+            return 0;
+        }
+    }
+};

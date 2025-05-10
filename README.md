@@ -1,135 +1,110 @@
 # Healthcare Appointment System
 
-A comprehensive healthcare platform that connects patients with doctors, manages appointments, medical records, and provides AI-powered health insights.
+A comprehensive full-stack healthcare platform that connects patients with doctors, manages appointments, and maintains medical records with a modern, responsive user interface.
 
-## 🚀 New Features Implemented
+## 🌟 Features
 
-### Enhanced User Interface and Experience
-- **Advanced UI Components**: All dashboards now feature modern UI elements with animations, transitions, and responsive design
-- **Global Styling**: Standardized design system with consistent color scheme, spacing, and typography
-- **Interactive Elements**: Enhanced buttons, cards, and form inputs with hover effects and visual feedback
+### User Management
+- **Multi-role Authentication**: Separate login flows for patients, doctors, and administrators
+- **Profile Management**: Users can update their personal information and credentials
+- **Role-based Access Control**: Different permissions and views based on user role
 
-### Appointment Booking System
-- **Doctor Search and Browse**: Patients can browse doctors by specialization 
-- **Appointment Scheduling**: Book, manage, and view appointment status
-- **Calendar Integration**: View doctor availability and select convenient time slots
-- **Notifications**: Get updates on appointment confirmation, cancellation, or rescheduling
+### Appointment System
+- **Doctor Discovery**: Patients can search and browse doctors by specialization
+- **Appointment Scheduling**: Interactive calendar for booking appointments with available time slots
+- **Appointment Management**: View, reschedule, or cancel upcoming appointments
+- **Notifications System**: Status updates on appointment confirmations and changes
 
-### Dashboard Improvements
-- **Doctor Dashboard**: 
-  - View and manage patient appointments
-  - Update appointment status (confirm/cancel)
-  - Check daily/weekly schedule
-  - Access patient medical history
+### Doctor Features
+- **Patient Management**: View assigned patients and their medical history
+- **Appointment Dashboard**: Manage daily/weekly schedule with appointment status updates
+- **Medical Records**: Create and update patient medical information
+- **Availability Management**: Set working hours and unavailable time slots
 
-- **Patient Dashboard**:
-  - Book and manage appointments
-  - View upcoming and past appointments
-  - Access medical history and records
-  - Get AI-powered health recommendations
+### Patient Features
+- **Doctor Selection**: Find doctors based on specialization, ratings, and availability
+- **Appointment Booking**: Easy scheduling interface with date and time selection
+- **Medical History**: Access to personal medical records and past appointments
+- **Health Insights**: View treatment plans and medical recommendations
 
-- **Admin Dashboard**:
-  - Comprehensive doctor and patient management
-  - Advanced data visualization with charts and statistics
-  - Medical records management with search and filter capabilities
-  - System-wide appointment oversight
+### Administrative Tools
+- **User Management**: Create, update, and manage doctor and patient accounts
+- **System Monitoring**: Dashboard with key metrics and system activity
+- **Data Management**: Tools for maintaining medical records and appointment data
 
-## 🧑‍⚕️ Pre-configured Doctor Accounts
+## 🛠️ Recent Bug Fixes & Improvements
 
-Use these accounts to test the doctor dashboard functionality:
+- Fixed appointment persistence issues where appointments weren't correctly stored in MySQL database
+- Resolved field name mismatch between frontend and backend API calls
+- Standardized API communication format between React frontend and Spring Boot backend
+- Improved error handling and user feedback in appointment booking flow
+- Enhanced form validation for user inputs across the application
 
-| Name | Email | Password | Specialization |
-|------|-------|----------|---------------|
-| Dr. Rajesh Kumar | rajesh.kumar@healthcare.com | Password@1 | Cardiology |
-| Dr. Priya Sharma | priya.sharma@healthcare.com | Password@1 | Dermatology |
-| Dr. Mohan Venkat | mohan.venkat@healthcare.com | Password@1 | General Medicine |
+## 📋 Technical Stack
 
-## 🏃‍♂️ Getting Started
+### Frontend
+- **Framework**: React.js with Vite build tool
+- **Routing**: React Router for navigation
+- **UI Components**: Custom components with modern design principles
+- **Charts & Visualization**: Chart.js for data visualization
+- **HTTP Client**: Axios for API communication
+
+### Backend
+- **Java Framework**: Spring Boot 3.2.3
+- **Security**: Spring Security with JWT authentication
+- **Database Access**: Spring Data JPA for database operations
+- **API Layer**: RESTful API endpoints with proper error handling
+
+### Database
+- **Engine**: MySQL 8.0
+- **ORM**: Hibernate (via Spring Data JPA)
+- **Schema**: Relational model with proper constraints and relationships
+
+## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js (v14.0.0 or higher)
-- MySQL database
+- Java 17 or higher
+- Maven 3.6 or higher
+- MySQL 8.0
 
-### Installation
 
-1. Clone the repository
-   ```
-   git clone https://github.com/yourusername/healthcare-appointment-system.git
-   cd healthcare-appointment-system
-   ```
 
-2. Install dependencies
-   ```
-   npm install
-   ```
+## 📦 Project Structure
 
-3. Create a database
-   ```
-   Run the reset_database.sql script in your MySQL Workbench
-   ```
+```
+healthcare-appointment-system/
+├── backend/                  # Spring Boot backend
+│   ├── src/                  # Java source files
+│   ├── pom.xml               # Maven dependencies
+│   └── ...
+├── src/                      # React frontend
+│   ├── components/           # Reusable UI components
+│   ├── pages/                # Page components
+│   ├── services/             # API and helper services
+│   ├── contexts/             # React context providers
+│   └── ...
+├── public/                   # Static assets
+├── package.json              # NPM dependencies
+└── ...
+```
 
-4. Start the backend server
-   ```
-   cd backend
-   mvn spring-boot:run
-   ```
+## 🔄 Workflow
 
-5. Start the frontend development server
-   ```
-   npm run dev
-   ```
+1. **Patient Appointment Booking**:
+   - Patient logs in and navigates to "Find a Doctor"
+   - Selects a doctor based on specialization
+   - Chooses available date and time slot
+   - Fills appointment details and confirms booking
+   - Views appointment in dashboard
 
-6. Access the application at `http://localhost:5173`
+2. **Doctor Appointment Management**:
+   - Doctor logs in to view dashboard with upcoming appointments
+   - Updates appointment status (confirm/reschedule/cancel)
+   - Adds notes or medical records after appointment
+   - Updates availability for future appointments
 
-### Default Login Information
 
-#### Admin Login
-- Email: admin@healthcare.com
-- Password: Password@1
+## 📧 Contact
 
-#### Doctor Login 
-- Email: rajesh.kumar@healthcare.com
-- Password: Password@1
-
-#### Patient Login
-- Email: rahul@example.com
-- Password: Password@1
-
-## 📋 Usage Flow
-
-### Patient
-1. Login or register as a patient
-2. Browse available doctors by specialization
-3. Book an appointment by selecting a doctor, date, and time slot
-4. View appointment status and history in the dashboard
-5. Access medical records and AI health recommendations
-
-### Doctor
-1. Login with doctor credentials
-2. View upcoming appointments on the dashboard
-3. Confirm or cancel patient appointments
-4. Access patient information and medical history
-5. Update availability schedule
-
-### Admin
-1. Login with admin credentials
-2. Manage doctor and patient accounts
-3. Oversee all appointments and medical records
-4. View analytics dashboard with system statistics
-
-## 🧪 Technical Implementation
-
-- **Frontend**: React, React Router, CSS modules
-- **Backend**: Spring Boot, MySQL
-- **Authentication**: JWT-based authentication
-- **Data Storage**: MySQL database + Local Storage for development
-- **API**: REST API with mock implementation for development
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🤝 Acknowledgements
-
-- All the contributors and team members who helped build this project
-- The open-source community for the amazing tools and libraries
+For questions or support, please contact me.

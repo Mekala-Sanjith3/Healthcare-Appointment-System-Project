@@ -37,19 +37,45 @@ public class SecurityServiceImpl implements SecurityService {
         
         UserDetails userDetails = (UserDetails) principal;
         
-        // If user is an admin, they can access any doctor information
+        // If user is an admin, they can access any doctor's data
         if (userDetails.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
             return true;
         }
         
-        // If user is the doctor themselves, they can access their information
+        // If user is a doctor, they can only access their own data
         if (userDetails.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_DOCTOR"))) {
-            if (principal instanceof Doctor) {
-                Doctor doctor = (Doctor) principal;
-                return doctor.getId().equals(doctorId);
-            }
+            return userDetails.getUsername().equals(doctorId);
+        }
+        
+        return false;
+    }
+    
+    @Override
+    public boolean isPatientAuthorized(String patientId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof UserDetails)) {
+            return false;
+        }
+        
+        UserDetails userDetails = (UserDetails) principal;
+        
+        // If user is an admin, they can access any patient's data
+        if (userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            return true;
+        }
+        
+        // If user is a patient, they can only access their own data
+        if (userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"))) {
+            return userDetails.getUsername().equals(patientId);
         }
         
         return false;
@@ -101,6 +127,42 @@ public class SecurityServiceImpl implements SecurityService {
                     return patient.getId().toString().equals(appointment.getPatientId());
                 }
             }
+        }
+        
+        return false;
+    }
+    
+    @Override
+    public boolean isAppointmentPatientAuthorized(Long appointmentId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof UserDetails)) {
+            return false;
+        }
+        
+        UserDetails userDetails = (UserDetails) principal;
+        
+        // If user is an admin, they can access any appointment
+        if (userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+            return true;
+        }
+        
+        Optional<Appointment> appointmentOpt = appointmentRepository.findById(appointmentId);
+        if (appointmentOpt.isEmpty()) {
+            return false;
+        }
+        
+        Appointment appointment = appointmentOpt.get();
+        
+        // If user is the patient of the appointment, they can access it
+        if (userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"))) {
+            return userDetails.getUsername().equals(appointment.getPatientId());
         }
         
         return false;

@@ -8,6 +8,7 @@ import AddDoctorModal from './AddDoctorModal';
 import AddPatientModal from './AddPatientModal';
 import AddAppointmentModal from './AddAppointmentModal';
 import ChartConfigurator from './ChartConfigurator';
+import MedicalRecordsView from './MedicalRecordsView';
 import { adminApi } from '../../../services/api';
 import "../../../styles/pages/admin/AdminDashboard.css";
 
@@ -17,6 +18,7 @@ const AdminDashboard = () => {
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
+  const [showAddMedicalRecordModal, setShowAddMedicalRecordModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [doctorFilters, setDoctorFilters] = useState({
     specialization: '',
@@ -29,6 +31,15 @@ const AdminDashboard = () => {
   const [appointmentFilters, setAppointmentFilters] = useState({
     status: 'all',
     date: ''
+  });
+  const [medicalRecordFilters, setMedicalRecordFilters] = useState({
+    recordType: '',
+    dateFrom: '',
+    dateTo: ''
+  });
+  const [staffFilters, setStaffFilters] = useState({
+    role: '',
+    department: ''
   });
   const [refreshAppointments, setRefreshAppointments] = useState(0);
 
@@ -70,6 +81,20 @@ const AdminDashboard = () => {
   const handleAppointmentFilterChange = (e) => {
     setAppointmentFilters({
       ...appointmentFilters,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleMedicalRecordFilterChange = (e) => {
+    setMedicalRecordFilters({
+      ...medicalRecordFilters,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleStaffFilterChange = (e) => {
+    setStaffFilters({
+      ...staffFilters,
       [e.target.name]: e.target.value
     });
   };
@@ -118,11 +143,43 @@ const AdminDashboard = () => {
           </button>
           
           <button 
+            className={`nav-item ${activeTab === 'medical-records' ? 'active' : ''}`}
+            onClick={() => setActiveTab('medical-records')}
+          >
+            <i className="fas fa-file-medical"></i>
+            Medical Records
+          </button>
+          
+          <button 
+            className={`nav-item ${activeTab === 'staff' ? 'active' : ''}`}
+            onClick={() => setActiveTab('staff')}
+          >
+            <i className="fas fa-user-nurse"></i>
+            Staff Management
+          </button>
+
+          <button 
+            className={`nav-item ${activeTab === 'finance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('finance')}
+          >
+            <i className="fas fa-money-bill-wave"></i>
+            Finance
+          </button>
+          
+          <button 
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => setActiveTab('analytics')}
           >
             <i className="fas fa-chart-bar"></i>
             Analytics
+          </button>
+          
+          <button 
+            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <i className="fas fa-cog"></i>
+            System Settings
           </button>
         </nav>
 
@@ -141,7 +198,11 @@ const AdminDashboard = () => {
               {activeTab === 'doctors' && 'Doctor Management'}
               {activeTab === 'patients' && 'Patient Management'}
               {activeTab === 'appointments' && 'Appointment Management'}
+              {activeTab === 'medical-records' && 'Medical Records Management'}
+              {activeTab === 'staff' && 'Staff Management'}
+              {activeTab === 'finance' && 'Financial Management'}
               {activeTab === 'analytics' && 'Analytics Dashboard'}
+              {activeTab === 'settings' && 'System Settings'}
             </h1>
           </div>
           <div className="header-actions">
@@ -170,6 +231,24 @@ const AdminDashboard = () => {
               >
                 <i className="fas fa-plus"></i>
                 Add New Appointment
+              </button>
+            )}
+            {activeTab === 'medical-records' && (
+              <button 
+                className="add-button"
+                onClick={() => setShowAddMedicalRecordModal(true)}
+              >
+                <i className="fas fa-plus"></i>
+                Add New Medical Record
+              </button>
+            )}
+            {activeTab === 'staff' && (
+              <button 
+                className="add-button"
+                onClick={() => {/* Add staff handler */}}
+              >
+                <i className="fas fa-plus"></i>
+                Add New Staff Member
               </button>
             )}
           </div>
@@ -311,8 +390,255 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {activeTab === 'medical-records' && (
+            <div className="medical-records-management">
+              <div className="search-filters">
+                <div className="search-box">
+                  <i className="fas fa-search"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search records by patient name, diagnosis..."
+                    value={searchTerm}
+                    onChange={handleSearch}
+                  />
+                </div>
+                <div className="filters">
+                  <select 
+                    name="recordType"
+                    value={medicalRecordFilters.recordType}
+                    onChange={handleMedicalRecordFilterChange}
+                  >
+                    <option value="">All Record Types</option>
+                    <option value="Diagnosis">Diagnosis</option>
+                    <option value="Lab Test">Lab Test</option>
+                    <option value="Prescription">Prescription</option>
+                    <option value="Imaging">Imaging</option>
+                    <option value="Surgery">Surgery</option>
+                  </select>
+                  <div className="date-filter-group">
+                    <input 
+                      type="date"
+                      name="dateFrom"
+                      value={medicalRecordFilters.dateFrom}
+                      onChange={handleMedicalRecordFilterChange}
+                      className="date-filter"
+                      placeholder="From"
+                    />
+                    <input 
+                      type="date"
+                      name="dateTo"
+                      value={medicalRecordFilters.dateTo}
+                      onChange={handleMedicalRecordFilterChange}
+                      className="date-filter"
+                      placeholder="To"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <MedicalRecordsView 
+                searchTerm={searchTerm}
+                filters={medicalRecordFilters}
+              />
+            </div>
+          )}
+
+          {activeTab === 'staff' && (
+            <div className="staff-management">
+              <div className="search-filters">
+                <div className="search-box">
+                  <i className="fas fa-search"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search staff by name, role, department..."
+                    value={searchTerm}
+                    onChange={handleSearch}
+                  />
+                </div>
+                <div className="filters">
+                  <select 
+                    name="role"
+                    value={staffFilters.role}
+                    onChange={handleStaffFilterChange}
+                  >
+                    <option value="">All Roles</option>
+                    <option value="Nurse">Nurse</option>
+                    <option value="Receptionist">Receptionist</option>
+                    <option value="Lab Technician">Lab Technician</option>
+                    <option value="Pharmacist">Pharmacist</option>
+                    <option value="Administrator">Administrator</option>
+                  </select>
+                  <select 
+                    name="department"
+                    value={staffFilters.department}
+                    onChange={handleStaffFilterChange}
+                  >
+                    <option value="">All Departments</option>
+                    <option value="Emergency">Emergency</option>
+                    <option value="Outpatient">Outpatient</option>
+                    <option value="Laboratory">Laboratory</option>
+                    <option value="Pharmacy">Pharmacy</option>
+                    <option value="Administration">Administration</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="staff-list-placeholder">
+                <div className="info-message">
+                  <i className="fas fa-info-circle"></i>
+                  <p>Staff management module is under development. Coming soon!</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'finance' && (
+            <div className="finance-management">
+              <div className="finance-dashboard">
+                <div className="finance-summary">
+                  <div className="finance-card">
+                    <div className="finance-icon">
+                      <i className="fas fa-dollar-sign"></i>
+                    </div>
+                    <div className="finance-data">
+                      <h3>Total Revenue</h3>
+                      <p className="finance-value">$128,450</p>
+                      <p className="finance-trend positive">
+                        <i className="fas fa-arrow-up"></i> 12.5% from last month
+                      </p>
+                    </div>
+                  </div>
+                  <div className="finance-card">
+                    <div className="finance-icon">
+                      <i className="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <div className="finance-data">
+                      <h3>Outstanding</h3>
+                      <p className="finance-value">$18,245</p>
+                      <p className="finance-trend negative">
+                        <i className="fas fa-arrow-up"></i> 5.2% from last month
+                      </p>
+                    </div>
+                  </div>
+                  <div className="finance-card">
+                    <div className="finance-icon">
+                      <i className="fas fa-chart-pie"></i>
+                    </div>
+                    <div className="finance-data">
+                      <h3>Expenses</h3>
+                      <p className="finance-value">$76,210</p>
+                      <p className="finance-trend positive">
+                        <i className="fas fa-arrow-down"></i> 3.8% from last month
+                      </p>
+                    </div>
+                  </div>
+                  <div className="finance-card">
+                    <div className="finance-icon">
+                      <i className="fas fa-balance-scale"></i>
+                    </div>
+                    <div className="finance-data">
+                      <h3>Net Profit</h3>
+                      <p className="finance-value">$52,240</p>
+                      <p className="finance-trend positive">
+                        <i className="fas fa-arrow-up"></i> 8.7% from last month
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="info-message">
+                  <i className="fas fa-info-circle"></i>
+                  <p>Detailed financial reporting module is under development. Coming soon!</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'analytics' && (
             <AnalyticsDashboard />
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="system-settings">
+              <div className="settings-container">
+                <div className="settings-card">
+                  <h3>System Configuration</h3>
+                  <div className="settings-section">
+                    <h4>General Settings</h4>
+                    <div className="settings-form-group">
+                      <label>Hospital Name</label>
+                      <input type="text" defaultValue="Healthcare Appointment System" />
+                    </div>
+                    <div className="settings-form-group">
+                      <label>Contact Email</label>
+                      <input type="email" defaultValue="admin@healthcaresystem.com" />
+                    </div>
+                    <div className="settings-form-group">
+                      <label>Contact Phone</label>
+                      <input type="tel" defaultValue="+1 (555) 123-4567" />
+                    </div>
+                  </div>
+                  <div className="settings-section">
+                    <h4>Notification Settings</h4>
+                    <div className="settings-form-group">
+                      <label className="toggle-switch">
+                        <input type="checkbox" defaultChecked />
+                        <span className="toggle-slider"></span>
+                        <span className="toggle-label">Email Notifications</span>
+                      </label>
+                    </div>
+                    <div className="settings-form-group">
+                      <label className="toggle-switch">
+                        <input type="checkbox" defaultChecked />
+                        <span className="toggle-slider"></span>
+                        <span className="toggle-label">SMS Notifications</span>
+                      </label>
+                    </div>
+                    <div className="settings-form-group">
+                      <label className="toggle-switch">
+                        <input type="checkbox" defaultChecked />
+                        <span className="toggle-slider"></span>
+                        <span className="toggle-label">System Notifications</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="settings-actions">
+                    <button className="settings-button save">Save Changes</button>
+                    <button className="settings-button cancel">Reset</button>
+                  </div>
+                </div>
+                <div className="settings-card">
+                  <h3>Security Settings</h3>
+                  <div className="settings-section">
+                    <h4>Password Policy</h4>
+                    <div className="settings-form-group">
+                      <label className="toggle-switch">
+                        <input type="checkbox" defaultChecked />
+                        <span className="toggle-slider"></span>
+                        <span className="toggle-label">Require Complex Passwords</span>
+                      </label>
+                    </div>
+                    <div className="settings-form-group">
+                      <label>Password Expiry (days)</label>
+                      <input type="number" defaultValue="90" min="0" />
+                    </div>
+                  </div>
+                  <div className="settings-section">
+                    <h4>Two-Factor Authentication</h4>
+                    <div className="settings-form-group">
+                      <label className="toggle-switch">
+                        <input type="checkbox" />
+                        <span className="toggle-slider"></span>
+                        <span className="toggle-label">Enable for All Staff</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="settings-actions">
+                    <button className="settings-button save">Save Changes</button>
+                    <button className="settings-button cancel">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

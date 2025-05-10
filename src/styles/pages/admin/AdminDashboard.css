@@ -382,3 +382,266 @@ body {
     margin-top: 1rem;
   }
 }
+
+/* Medical Records Management */
+.medical-records-management {
+  width: 100%;
+}
+
+.date-filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* Staff Management */
+.staff-management {
+  width: 100%;
+}
+
+.staff-list-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.info-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  background-color: #e6f7ff;
+  border-radius: 8px;
+  border-left: 4px solid #1890ff;
+}
+
+.info-message i {
+  font-size: 24px;
+  color: #1890ff;
+}
+
+.info-message p {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+/* Finance Management */
+.finance-management {
+  width: 100%;
+}
+
+.finance-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.finance-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.finance-card {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.finance-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #f0f7ff;
+  margin-right: 15px;
+}
+
+.finance-icon i {
+  font-size: 24px;
+  color: #4e73df;
+}
+
+.finance-data {
+  flex: 1;
+}
+
+.finance-data h3 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.finance-value {
+  margin: 0 0 5px 0;
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.finance-trend {
+  margin: 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.finance-trend.positive {
+  color: #1cc88a;
+}
+
+.finance-trend.negative {
+  color: #e74a3b;
+}
+
+/* System Settings */
+.system-settings {
+  width: 100%;
+}
+
+.settings-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.settings-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.settings-card h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.settings-section {
+  margin-bottom: 25px;
+}
+
+.settings-section h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #555;
+}
+
+.settings-form-group {
+  margin-bottom: 15px;
+}
+
+.settings-form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: #555;
+}
+
+.settings-form-group input[type="text"],
+.settings-form-group input[type="email"],
+.settings-form-group input[type="tel"],
+.settings-form-group input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  background-color: #ccc;
+  border-radius: 10px;
+  transition: .4s;
+  margin-right: 10px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+}
+
+input:checked + .toggle-slider {
+  background-color: #4e73df;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  color: #555;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.settings-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.settings-button.save {
+  background-color: #4e73df;
+  color: #fff;
+}
+
+.settings-button.save:hover {
+  background-color: #3a5fc6;
+}
+
+.settings-button.cancel {
+  background-color: #f8f9fc;
+  border: 1px solid #ddd;
+  color: #555;
+}
+
+.settings-button.cancel:hover {
+  background-color: #eaecf4;
+}
