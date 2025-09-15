@@ -9,6 +9,8 @@ import AddPatientModal from './AddPatientModal';
 import AddAppointmentModal from './AddAppointmentModal';
 import ChartConfigurator from './ChartConfigurator';
 import MedicalRecordsView from './MedicalRecordsView';
+import StaffManagement from './StaffManagement';
+import FinanceManagement from './FinanceManagement';
 import { adminApi } from '../../../services/api';
 import "../../../styles/pages/admin/AdminDashboard.css";
 
@@ -483,73 +485,16 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="staff-list-placeholder">
-                <div className="info-message">
-                  <i className="fas fa-info-circle"></i>
-                  <p>Staff management module is under development. Coming soon!</p>
-                </div>
-              </div>
+              <StaffManagement 
+                searchTerm={searchTerm}
+                filters={staffFilters}
+              />
             </div>
           )}
 
           {activeTab === 'finance' && (
             <div className="finance-management">
-              <div className="finance-dashboard">
-                <div className="finance-summary">
-                  <div className="finance-card">
-                    <div className="finance-icon">
-                      <i className="fas fa-dollar-sign"></i>
-                    </div>
-                    <div className="finance-data">
-                      <h3>Total Revenue</h3>
-                      <p className="finance-value">$128,450</p>
-                      <p className="finance-trend positive">
-                        <i className="fas fa-arrow-up"></i> 12.5% from last month
-                      </p>
-                    </div>
-                  </div>
-                  <div className="finance-card">
-                    <div className="finance-icon">
-                      <i className="fas fa-hand-holding-usd"></i>
-                    </div>
-                    <div className="finance-data">
-                      <h3>Outstanding</h3>
-                      <p className="finance-value">$18,245</p>
-                      <p className="finance-trend negative">
-                        <i className="fas fa-arrow-up"></i> 5.2% from last month
-                      </p>
-                    </div>
-                  </div>
-                  <div className="finance-card">
-                    <div className="finance-icon">
-                      <i className="fas fa-chart-pie"></i>
-                    </div>
-                    <div className="finance-data">
-                      <h3>Expenses</h3>
-                      <p className="finance-value">$76,210</p>
-                      <p className="finance-trend positive">
-                        <i className="fas fa-arrow-down"></i> 3.8% from last month
-                      </p>
-                    </div>
-                  </div>
-                  <div className="finance-card">
-                    <div className="finance-icon">
-                      <i className="fas fa-balance-scale"></i>
-                    </div>
-                    <div className="finance-data">
-                      <h3>Net Profit</h3>
-                      <p className="finance-value">$52,240</p>
-                      <p className="finance-trend positive">
-                        <i className="fas fa-arrow-up"></i> 8.7% from last month
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="info-message">
-                  <i className="fas fa-info-circle"></i>
-                  <p>Detailed financial reporting module is under development. Coming soon!</p>
-                </div>
-              </div>
+              <FinanceManagement />
             </div>
           )}
 

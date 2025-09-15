@@ -10,6 +10,7 @@ import PatientDashboard from '../components/pages/patient/PatientDashboard';
 import AdminLogin from '../components/pages/admin/AdminLogin';
 import AdminRegister from '../components/pages/admin/AdminRegister';
 import AdminDashboard from '../components/pages/admin/AdminDashboard';
+import AdvancedFeatures from '../components/pages/AdvancedFeatures';
 import ProtectedRoute from './ProtectedRoute';
 
 const AppRoutes = () => {
@@ -18,6 +19,7 @@ const AppRoutes = () => {
       {/* Public Routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/home" element={<HomePage />} />
+      <Route path="/advanced-features" element={<AdvancedFeatures />} />
       
       {/* Admin Routes */}
       <Route path="/admin-login" element={<AdminLogin />} />

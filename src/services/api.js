@@ -420,7 +420,10 @@ export const authApi = {
                 }
                 
                 // In a real app, we'd verify the password with encryption
-                // For mock purposes, let's assume all passwords are valid here
+                // For mock purposes, we need to check if password matches
+                if (credentials.password !== foundUser.password) {
+                    throw new Error("Invalid credentials: Password is incorrect");
+                }
                 
                 // Create mock login response
                 const mockResponse = {

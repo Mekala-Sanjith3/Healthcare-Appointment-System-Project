@@ -769,6 +769,25 @@ body {
   display: none;
 }
 
+.tech-btn {
+  background: var(--gradient-purple, linear-gradient(135deg, #6a11cb 0%, #2575fc 100%));
+  color: var(--white) !important;
+  padding: 8px 20px;
+  border-radius: 25px;
+  margin-right: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tech-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(106, 17, 203, 0.2);
+}
+
+.tech-btn::after {
+  display: none;
+}
+
 /* Main Content Styles */
 .main-content {
   text-align: center;
@@ -1637,4 +1656,22 @@ button:focus, a:focus {
 .testimonials-section h2:hover::after {
   width: 120px;  /* Expand underline on hover */
   transition: width 0.3s ease;
+}
+
+/* Add styling for the technology card */
+.technology-card {
+  background: linear-gradient(135deg, #6a11cb10 0%, #2575fc10 100%);
+  border: 2px solid #6a11cb30;
+}
+
+.technology-card h3 {
+  color: #6a11cb;
+}
+
+.tech-portal-btn {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+}
+
+.tech-portal-btn:hover {
+  box-shadow: 0 4px 15px rgba(106, 17, 203, 0.3);
 }

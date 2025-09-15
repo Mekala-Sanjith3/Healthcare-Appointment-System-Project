@@ -274,6 +274,13 @@ const HomePage = () => {
               <h3>Modern Laboratories</h3>
               <p>Advanced diagnostic facilities with precise and quick results</p>
             </div>
+            <div className="feature-card" onClick={() => navigate('/advanced-features')}>
+              <div className="feature-icon">
+                <i className="fas fa-server"></i>
+              </div>
+              <h3>Cutting-Edge Architecture</h3>
+              <p>API Gateway, Microservices & Load Balancing for reliable healthcare access</p>
+            </div>
           </div>
         </section>
 

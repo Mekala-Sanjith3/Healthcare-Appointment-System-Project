@@ -68,8 +68,6 @@ A comprehensive full-stack healthcare platform that connects patients with docto
 - Maven 3.6 or higher
 - MySQL 8.0
 
-
-
 ## 📦 Project Structure
 
 ```
@@ -104,7 +102,29 @@ healthcare-appointment-system/
    - Adds notes or medical records after appointment
    - Updates availability for future appointments
 
-
 ## 📧 Contact
 
 For questions or support, please contact me.
+
+## Continuous Integration/Continuous Deployment (CI/CD)
+
+This project is set up with CI/CD using GitHub Actions for automated deployment.
+
+### Deployment Architecture
+
+- **Frontend**: React app deployed to Netlify
+- **Backend API**: Node.js Express API deployed to Railway
+- **API Gateway**: Express-based API Gateway deployed to Heroku
+- **Database**: MongoDB Atlas (Cloud Database)
+
+### Deployment Status
+
+| Component | Status | URL |
+|-----------|--------|-----|
+| Frontend | [![Netlify Status](https://api.netlify.com/api/v1/badges/your-site-id/deploy-status)](https://app.netlify.com/sites/your-site-name/deploys) | [https://healthcare-app.netlify.app](https://healthcare-app.netlify.app) |
+| API Gateway | [![Heroku Status](https://heroku-badge.herokuapp.com/?app=healthcare-api-gateway)](https://healthcare-api-gateway.herokuapp.com) | [https://healthcare-api-gateway.herokuapp.com](https://healthcare-api-gateway.herokuapp.com) |
+| Backend API | Deployed to Railway | [https://healthcare-api.railway.app](https://healthcare-api.railway.app) |
+
+### Deployment Process
+
+For detailed instructions on the CI/CD process and manual deployment options, please see the [DEPLOYMENT.md](DEPLOYMENT.md) file.
