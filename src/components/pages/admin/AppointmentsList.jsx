@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import { adminApi } from '../../../services/api';
+import { adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/AppointmentsList.css';
 
 const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {

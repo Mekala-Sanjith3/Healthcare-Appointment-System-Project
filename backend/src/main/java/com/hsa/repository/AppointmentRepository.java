@@ -2,6 +2,7 @@ package com.hsa.repository;
 
 import com.hsa.model.Appointment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -14,4 +15,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByDoctorIdAndAppointmentDate(String doctorId, LocalDate appointmentDate);
     
     List<Appointment> findByPatientId(String patientId);
+    
+    long countByStatus(Appointment.AppointmentStatus status);
+    
+    List<Appointment> findTop10ByOrderByCreatedAtDesc();
 } 

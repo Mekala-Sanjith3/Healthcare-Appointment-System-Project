@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { notificationApi } from '../../services/api';
+// Notifications will be handled by real-time backend later
+// import { notificationApi } from '../../services/realtimeApi';
 import '../../styles/components/NotificationCenter.css';
 
 const NotificationCenter = ({ userId, userRole }) => {

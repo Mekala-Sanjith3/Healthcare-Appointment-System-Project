@@ -1,174 +1,181 @@
 package com.hsa.controller;
 
-import com.hsa.dto.DoctorResponse;
-import com.hsa.dto.PatientResponse;
-import com.hsa.dto.CreateDoctorRequest;
-import com.hsa.dto.CreatePatientRequest;
-import com.hsa.dto.UpdateDoctorRequest;
-import com.hsa.dto.UpdatePatientRequest;
-import com.hsa.dto.UpdateDoctorStatusRequest;
+import com.hsa.model.User;
 import com.hsa.model.Doctor;
 import com.hsa.model.Patient;
-import com.hsa.service.AdminService;
+import com.hsa.model.Appointment;
+import com.hsa.repository.UserRepository;
+import com.hsa.repository.DoctorRepository;
+import com.hsa.repository.PatientRepository;
+import com.hsa.repository.AppointmentRepository;
+import com.hsa.dto.PatientCreationRequest;
+import com.hsa.dto.DoctorCreationRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.MediaType;
-import java.io.IOException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final AdminService adminService;
+    private final UserRepository userRepository;
+    private final DoctorRepository doctorRepository;
+    private final PatientRepository patientRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    @GetMapping("/doctors")
-    public ResponseEntity<List<DoctorResponse>> getAllDoctors() {
-        List<Doctor> doctors = adminService.getAllDoctors();
-        List<DoctorResponse> response = doctors.stream()
-                .map(this::mapToDoctorResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/doctors/{id}")
-    public ResponseEntity<DoctorResponse> getDoctorById(@PathVariable String id) {
-        Doctor doctor = adminService.getDoctorById(id);
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @PostMapping("/doctors")
-    public ResponseEntity<DoctorResponse> createDoctor(@RequestBody CreateDoctorRequest request) {
-        Doctor doctor = adminService.createDoctor(request);
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @PutMapping("/doctors/{id}")
-    public ResponseEntity<DoctorResponse> updateDoctor(
-            @PathVariable String id,
-            @RequestBody UpdateDoctorRequest request) {
-        Doctor doctor = adminService.updateDoctor(id, request);
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @PutMapping("/doctors/{id}/status")
-    public ResponseEntity<DoctorResponse> updateDoctorStatus(
-            @PathVariable String id,
-            @RequestBody UpdateDoctorStatusRequest request) {
-        Doctor doctor = adminService.updateDoctorStatus(id, request.getStatus());
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @PostMapping(value = "/doctors/{id}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DoctorResponse> uploadProfilePicture(
-            @PathVariable String id,
-            @RequestParam("file") MultipartFile file) throws IOException {
-        Doctor doctor = adminService.uploadProfilePicture(id, file);
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @PostMapping(value = "/doctors/{id}/credentials", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DoctorResponse> uploadCredentials(
-            @PathVariable String id,
-            @RequestParam("file") MultipartFile file) throws IOException {
-        Doctor doctor = adminService.uploadCredentials(id, file);
-        return ResponseEntity.ok(mapToDoctorResponse(doctor));
-    }
-
-    @DeleteMapping("/doctors/{id}")
-    public ResponseEntity<Void> deleteDoctor(@PathVariable String id) {
-        adminService.deleteDoctor(id);
-        return ResponseEntity.noContent().build();
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<Map<String, Object>> getDashboardStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        try {
+            // Get real counts from database
+            long totalPatients = patientRepository.count();
+            long totalDoctors = doctorRepository.count();
+            long totalAdmins = userRepository.countByRole(User.Role.ADMIN);
+            long totalAppointments = appointmentRepository.count();
+            
+            // Get appointment statistics
+            long pendingAppointments = appointmentRepository.countByStatus(Appointment.AppointmentStatus.PENDING);
+            long confirmedAppointments = appointmentRepository.countByStatus(Appointment.AppointmentStatus.CONFIRMED);
+            long cancelledAppointments = appointmentRepository.countByStatus(Appointment.AppointmentStatus.CANCELLED);
+            long completedAppointments = appointmentRepository.countByStatus(Appointment.AppointmentStatus.COMPLETED);
+            
+            stats.put("totalPatients", totalPatients);
+            stats.put("totalDoctors", totalDoctors);
+            stats.put("totalAdmins", totalAdmins);
+            stats.put("totalAppointments", totalAppointments);
+            stats.put("pendingAppointments", pendingAppointments);
+            stats.put("confirmedAppointments", confirmedAppointments);
+            stats.put("cancelledAppointments", cancelledAppointments);
+            stats.put("completedAppointments", completedAppointments);
+            
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to fetch dashboard statistics");
+            error.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
     }
 
     @GetMapping("/patients")
-    public ResponseEntity<List<PatientResponse>> getAllPatients() {
-        List<Patient> patients = adminService.getAllPatients();
-        List<PatientResponse> response = patients.stream()
-                .map(this::mapToPatientResponse)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<List<Patient>> getAllPatients() {
+        try {
+            List<Patient> patients = patientRepository.findAll();
+            return ResponseEntity.ok(patients);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @GetMapping("/patients/{id}")
-    public ResponseEntity<PatientResponse> getPatientById(@PathVariable Long id) {
-        Patient patient = adminService.getPatientById(id);
-        return ResponseEntity.ok(mapToPatientResponse(patient));
+    @GetMapping("/doctors")
+    public ResponseEntity<List<Doctor>> getAllDoctors() {
+        try {
+            List<Doctor> doctors = doctorRepository.findAll();
+            return ResponseEntity.ok(doctors);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/appointments")
+    public ResponseEntity<List<Appointment>> getAllAppointments() {
+        try {
+            List<Appointment> appointments = appointmentRepository.findAll();
+            return ResponseEntity.ok(appointments);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/appointments/recent")
+    public ResponseEntity<List<Appointment>> getRecentAppointments() {
+        try {
+            List<Appointment> appointments = appointmentRepository.findTop10ByOrderByCreatedAtDesc();
+            return ResponseEntity.ok(appointments);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/users/admins")
+    public ResponseEntity<List<User>> getAllAdmins() {
+        try {
+            List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+            return ResponseEntity.ok(admins);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PostMapping("/patients")
-    public ResponseEntity<PatientResponse> createPatient(@RequestBody CreatePatientRequest request) {
-        Patient patient = adminService.createPatient(request);
-        return ResponseEntity.ok(mapToPatientResponse(patient));
+    public ResponseEntity<Patient> createPatient(@RequestBody PatientCreationRequest request) {
+        try {
+            // Check if email already exists
+            if (patientRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Create new patient
+            Patient patient = new Patient(
+                request.getName(),
+                request.getEmail(),
+                passwordEncoder.encode(request.getPassword()),
+                request.getPhoneNumber(),
+                request.getAddress(),
+                request.getBloodGroup(),
+                request.getAge(),
+                request.getGender()
+            );
+
+            Patient savedPatient = patientRepository.save(patient);
+            return ResponseEntity.ok(savedPatient);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @PutMapping("/patients/{id}")
-    public ResponseEntity<PatientResponse> updatePatient(
-            @PathVariable Long id,
-            @RequestBody UpdatePatientRequest request) {
-        Patient patient = adminService.updatePatient(id, request);
-        return ResponseEntity.ok(mapToPatientResponse(patient));
+    @PostMapping("/doctors")
+    public ResponseEntity<Doctor> createDoctor(@RequestBody DoctorCreationRequest request) {
+        try {
+            // Check if email already exists
+            if (doctorRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Create new doctor
+            Doctor doctor = new Doctor();
+            doctor.setId(generateDoctorId());
+            doctor.setName(request.getName());
+            doctor.setEmail(request.getEmail());
+            doctor.setPassword(passwordEncoder.encode(request.getPassword()));
+            doctor.setSpecialization(request.getSpecialization());
+            doctor.setPhoneNumber(request.getPhoneNumber());
+            doctor.setAddress(request.getAddress());
+            doctor.setExperience(request.getExperience().toString());
+            doctor.setQualification(request.getQualification());
+            doctor.setConsultationFee(request.getConsultationFee());
+            doctor.setStatus("ACTIVE");
+            doctor.setCreatedAt(java.time.LocalDateTime.now());
+
+            Doctor savedDoctor = doctorRepository.save(doctor);
+            return ResponseEntity.ok(savedDoctor);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @DeleteMapping("/patients/{id}")
-    public ResponseEntity<Void> deletePatient(@PathVariable Long id) {
-        adminService.deletePatient(id);
-        return ResponseEntity.noContent().build();
+    private String generateDoctorId() {
+        return "DOC_" + System.currentTimeMillis();
     }
-
-    @PostMapping(value = "/patients/{id}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<PatientResponse> uploadPatientProfilePicture(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) throws IOException {
-        Patient patient = adminService.uploadPatientProfilePicture(id, file);
-        return ResponseEntity.ok(mapToPatientResponse(patient));
-    }
-
-    @PostMapping(value = "/patients/{id}/medical-records", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<PatientResponse> uploadMedicalRecords(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) throws IOException {
-        Patient patient = adminService.uploadMedicalRecords(id, file);
-        return ResponseEntity.ok(mapToPatientResponse(patient));
-    }
-
-    private DoctorResponse mapToDoctorResponse(Doctor doctor) {
-        return new DoctorResponse(
-                doctor.getId(),
-                doctor.getName(),
-                doctor.getEmail(),
-                doctor.getSpecialization(),
-                doctor.getQualification(),
-                doctor.getExperience(),
-                doctor.getClinicAddress(),
-                doctor.getStatus(),
-                doctor.getProfilePicture(),
-                doctor.getCredentialsFile(),
-                doctor.getConsultationFee(),
-                doctor.getAvailabilitySchedule()
-        );
-    }
-
-    private PatientResponse mapToPatientResponse(Patient patient) {
-        return new PatientResponse(
-                patient.getId(),
-                patient.getName(),
-                patient.getEmail(),
-                patient.getPhoneNumber(),
-                patient.getAddress(),
-                patient.getBloodGroup(),
-                patient.getAge(),
-                patient.getGender(),
-                patient.getProfilePicture(),
-                patient.getMedicalRecords()
-        );
-    }
-} 
+}

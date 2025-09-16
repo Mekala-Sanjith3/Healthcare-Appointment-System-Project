@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { adminApi } from '../../../services/api';
+import { adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/AddPatientModal.css';
 
 const AddPatientModal = ({ isOpen, onClose, onAdd }) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { reviewsApi } from '../../../services/api';
+import { reviewsApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/doctor/DoctorReviews.css';
 
 const DoctorReviews = ({ doctorId }) => {

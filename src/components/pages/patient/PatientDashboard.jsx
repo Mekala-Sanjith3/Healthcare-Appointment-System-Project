@@ -4,7 +4,7 @@ import "../../../styles/pages/patient/PatientDashboard.css";
 import "../../../styles/pages/patient/MedicalRecords.css"; // Import the new CSS file
 import BookAppointmentModal from './BookAppointmentModal';
 import DoctorSearch from './DoctorSearch';
-import { appointmentApi, patientApi, medicalRecordsApi, reviewsApi } from '../../../services/api';
+import { patientApi, appointmentApi, medicalRecordsApi } from '../../../services/realtimeApi';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
@@ -29,11 +29,13 @@ const PatientDashboard = () => {
   const [showVideoCall, setShowVideoCall] = useState(false);
   const [currentSession, setCurrentSession] = useState(null);
   const [healthMetrics, setHealthMetrics] = useState({
-    overallScore: 85,
-    exercise: 70,
-    diet: 80,
-    sleep: 90,
-    stress: 75
+    overallScore: null,
+    exercise: null,
+    diet: null,
+    sleep: null,
+    stress: null,
+    insights: [],
+    recommendations: {}
   });
   const [recommendationFocus, setRecommendationFocus] = useState('all');
   const [isAiLoadingInsights, setIsAiLoadingInsights] = useState(false);
@@ -64,24 +66,9 @@ const PatientDashboard = () => {
     reminder: false
   });
   const [healthAnalytics, setHealthAnalytics] = useState({
-    bloodPressure: [
-      {date: '2023-01-15', systolic: 120, diastolic: 80},
-      {date: '2023-02-15', systolic: 118, diastolic: 78},
-      {date: '2023-03-15', systolic: 122, diastolic: 82},
-      {date: '2023-04-15', systolic: 121, diastolic: 79}
-    ],
-    glucose: [
-      {date: '2023-01-15', value: 95},
-      {date: '2023-02-15', value: 98},
-      {date: '2023-03-15', value: 97},
-      {date: '2023-04-15', value: 94}
-    ],
-    weight: [
-      {date: '2023-01-15', value: 70},
-      {date: '2023-02-15', value: 69.5},
-      {date: '2023-03-15', value: 69},
-      {date: '2023-04-15', value: 68.5}
-    ]
+    bloodPressure: [],
+    glucose: [],
+    weight: []
   });
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [documentFormData, setDocumentFormData] = useState({
@@ -169,8 +156,8 @@ const PatientDashboard = () => {
           if (patientAppointments && Array.isArray(patientAppointments)) {
             setAppointments(patientAppointments);
           } else {
-            console.error('Invalid response format for appointments');
-            setError("Failed to load your appointments. Invalid data format received.");
+            console.log('No appointments found or invalid response format');
+            setAppointments([]); // Set empty array instead of error
           }
         } catch (error) {
           console.error("Failed to load patient data:", error);
@@ -295,41 +282,19 @@ const PatientDashboard = () => {
   // Add this useEffect to fetch telemedicine sessions
   useEffect(() => {
     if (activeTab === 'telemedicine' && userData.id) {
-      // Simulate fetching telemedicine sessions
-      // In a real app, you would have a specific API call for this
+      // Fetch real telemedicine sessions from database
       const fetchTelemedicineSessions = async () => {
         setIsLoading(true);
         try {
-          // Filter appointments to get ones marked as telemedicine
+          // Filter appointments to get ones marked as telemedicine or video consultation
           const teleSessions = appointments.filter(
             app => app.appointmentType?.toLowerCase().includes('tele') || 
-                  app.appointmentType?.toLowerCase().includes('video')
+                  app.appointmentType?.toLowerCase().includes('video') ||
+                  app.appointmentType?.toLowerCase().includes('online')
           );
           
-          // For demo, add a mock upcoming session if none exist
-          if (teleSessions.length === 0) {
-            const today = new Date();
-            const futureDate = new Date(today);
-            futureDate.setHours(today.getHours() + 2);
-            
-            const mockSession = {
-              id: 'tele_' + Date.now(),
-              doctorName: 'Dr. Sarah Johnson',
-              appointmentType: 'Video Consultation',
-              appointmentDate: today.toISOString().split('T')[0],
-              appointmentTime: `${futureDate.getHours()}:00`,
-              status: 'CONFIRMED',
-              notes: 'Follow-up for your recent checkup',
-              doctorId: 'doc_1',
-              patientId: userData.id,
-              meetingUrl: 'https://meet.example.com/dr-sarah-johnson',
-              isTeleMedicine: true
-            };
-            
-            setTelemedicineSessions([mockSession]);
-          } else {
-            setTelemedicineSessions(teleSessions);
-          }
+          // Only show real telemedicine appointments from database
+          setTelemedicineSessions(teleSessions);
           
         } catch (error) {
           console.error("Failed to load telemedicine sessions:", error);
@@ -350,47 +315,35 @@ const PatientDashboard = () => {
         setIsAiLoadingInsights(true);
         
         try {
-          // In a real app, you would make an API call to get personalized AI insights
-          // For demo purposes, we'll simulate a delay and use mock data
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Mock data based on medical records
-          const insights = {
-            overallScore: 85,
-            exercise: medicalRecords.length > 2 ? 70 : 60,
-            diet: 80,
-            sleep: 90,
-            stress: 75,
-            recommendations: {
-              exercise: [
-                { title: "Morning Walk", description: "Start with a 15-minute morning walk to boost metabolism" },
-                { title: "Strength Training", description: "Add 2 days of light strength training to your weekly routine" },
-                { title: "Active Breaks", description: "Take a 5-minute movement break for every hour of sitting" }
-              ],
-              diet: [
-                { title: "Increase Protein", description: "Add more lean protein sources to support muscle health" },
-                { title: "Hydration", description: "Drink at least 8 glasses of water daily" },
-                { title: "Reduce Sugar", description: "Cut down on processed sugars to improve energy levels" }
-              ],
-              sleep: [
-                { title: "Consistent Schedule", description: "Maintain a regular sleep schedule, even on weekends" },
-                { title: "Screen Time", description: "Avoid screens 1 hour before bedtime to improve sleep quality" },
-                { title: "Sleep Environment", description: "Ensure your bedroom is dark, quiet, and cool for optimal rest" }
-              ],
-              mental: [
-                { title: "Mindfulness Practice", description: "Spend 10 minutes daily on mindfulness meditation" },
-                { title: "Stress Management", description: "Identify stress triggers and develop coping strategies" },
-                { title: "Social Connection", description: "Maintain regular social interactions to support mental health" }
+          // Only show insights if there are medical records
+          if (medicalRecords.length > 0) {
+            // Generate basic insights from medical records
+            const insights = {
+              overallScore: null, // Don't show mock score
+              exercise: null,
+              diet: null,
+              sleep: null,
+              stress: null,
+              recommendations: {},
+              insights: [
+                `You have ${medicalRecords.length} medical record(s) in your history.`,
+                "Consult with your healthcare provider for personalized health insights."
               ]
-            },
-            insights: [
-              "Your blood pressure has been consistently in the healthy range",
-              "Consider discussing vitamin D supplementation with your doctor",
-              "Your latest checkup shows excellent progress in overall health",
-            ]
-          };
-          
-          setHealthMetrics(insights);
+            };
+            
+            setHealthMetrics(insights);
+          } else {
+            // No medical records, show empty state
+            setHealthMetrics({
+              overallScore: null,
+              exercise: null,
+              diet: null,
+              sleep: null,
+              stress: null,
+              insights: [],
+              recommendations: {}
+            });
+          }
         } catch (error) {
           console.error("Failed to load health insights:", error);
           setError("Failed to load AI health recommendations. Please try again later.");

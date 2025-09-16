@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { adminApi } from '../../../services/api';
+import { adminApi } from '../../../services/realtimeApi';
 import { Line, Pie } from 'react-chartjs-2';
 import { 
   Chart as ChartJS, 

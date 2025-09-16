@@ -1,89 +1,120 @@
 package com.hsa.controller;
 
-import com.hsa.dto.AvailabilityDTO;
-import com.hsa.dto.DoctorProfileDTO;
-import com.hsa.dto.PatientHistoryDTO;
-import com.hsa.dto.SimpleResponse;
+import com.hsa.model.Doctor;
 import com.hsa.model.Appointment;
-import com.hsa.service.DoctorService;
+import com.hsa.model.Patient;
+import com.hsa.repository.DoctorRepository;
+import com.hsa.repository.AppointmentRepository;
+import com.hsa.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/doctors")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*", allowedHeaders = "*")
+@PreAuthorize("hasRole('DOCTOR')")
 public class DoctorController {
 
-    private final DoctorService doctorService;
-
-    @GetMapping("/{doctorId}/profile")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<DoctorProfileDTO> getDoctorProfile(@PathVariable String doctorId) {
-        return ResponseEntity.ok(doctorService.getDoctorProfile(doctorId));
-    }
-
-    @PutMapping("/{doctorId}/profile")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<DoctorProfileDTO> updateDoctorProfile(
-            @PathVariable String doctorId,
-            @RequestBody DoctorProfileDTO profileDTO) {
-        return ResponseEntity.ok(doctorService.updateDoctorProfile(doctorId, profileDTO));
-    }
+    private final DoctorRepository doctorRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final PatientRepository patientRepository;
 
     @GetMapping("/{doctorId}/appointments")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<List<Appointment>> getDoctorAppointments(
-            @PathVariable String doctorId,
-            @RequestParam(required = false) String date,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(doctorService.getDoctorAppointments(doctorId, date, status, search));
+    public ResponseEntity<List<Appointment>> getDoctorAppointments(@PathVariable String doctorId) {
+        try {
+            List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            return ResponseEntity.ok(appointments);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @PutMapping("/appointments/{appointmentId}/status")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isAppointmentDoctorAuthorized(#appointmentId)")
-    public ResponseEntity<Appointment> updateAppointmentStatus(
-            @PathVariable Long appointmentId,
-            @RequestBody Map<String, String> statusUpdate) {
-        String status = statusUpdate.get("status");
-        return ResponseEntity.ok(doctorService.updateAppointmentStatus(appointmentId, status));
+    @GetMapping("/{doctorId}/patients")
+    public ResponseEntity<List<Patient>> getDoctorPatients(@PathVariable String doctorId) {
+        try {
+            // Get all appointments for this doctor
+            List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            
+            // Extract unique patient IDs
+            List<String> patientIds = appointments.stream()
+                .map(Appointment::getPatientId)
+                .distinct()
+                .collect(Collectors.toList());
+            
+            // Get patient details
+            List<Patient> patients = patientIds.stream()
+                .map(patientId -> {
+                    try {
+                        return patientRepository.findById(Long.parseLong(patientId)).orElse(null);
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(patient -> patient != null)
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(patients);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @GetMapping("/{doctorId}/availability")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<AvailabilityDTO> getDoctorAvailability(@PathVariable String doctorId) {
-        return ResponseEntity.ok(doctorService.getDoctorAvailability(doctorId));
+    @GetMapping("/{doctorId}/dashboard/stats")
+    public ResponseEntity<Map<String, Object>> getDoctorDashboardStats(@PathVariable String doctorId) {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            // Get appointments for this doctor
+            List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            
+            // Calculate statistics
+            long totalAppointments = appointments.size();
+            long pendingAppointments = appointments.stream()
+                .filter(app -> app.getStatus() == Appointment.AppointmentStatus.PENDING)
+                .count();
+            long confirmedAppointments = appointments.stream()
+                .filter(app -> app.getStatus() == Appointment.AppointmentStatus.CONFIRMED)
+                .count();
+            long completedAppointments = appointments.stream()
+                .filter(app -> app.getStatus() == Appointment.AppointmentStatus.COMPLETED)
+                .count();
+            
+            // Get unique patients count
+            long totalPatients = appointments.stream()
+                .map(Appointment::getPatientId)
+                .distinct()
+                .count();
+            
+            stats.put("totalAppointments", totalAppointments);
+            stats.put("pendingAppointments", pendingAppointments);
+            stats.put("confirmedAppointments", confirmedAppointments);
+            stats.put("completedAppointments", completedAppointments);
+            stats.put("totalPatients", totalPatients);
+            
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @PutMapping("/{doctorId}/availability")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<AvailabilityDTO> updateDoctorAvailability(
-            @PathVariable String doctorId,
-            @RequestBody AvailabilityDTO availabilityDTO) {
-        return ResponseEntity.ok(doctorService.updateDoctorAvailability(doctorId, availabilityDTO));
+    @GetMapping("/{doctorId}/profile")
+    public ResponseEntity<Doctor> getDoctorProfile(@PathVariable String doctorId) {
+        try {
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(doctor);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
-
-    @GetMapping("/patients/{patientId}/history")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<List<PatientHistoryDTO>> getPatientHistory(@PathVariable String patientId) {
-        return ResponseEntity.ok(doctorService.getPatientHistory(patientId));
-    }
-
-    @GetMapping("/{doctorId}/notifications")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isDoctorAuthorized(#doctorId)")
-    public ResponseEntity<?> getDoctorNotifications(@PathVariable String doctorId) {
-        return ResponseEntity.ok(doctorService.getDoctorNotifications(doctorId));
-    }
-
-    @PutMapping("/notifications/{notificationId}/read")
-    @PreAuthorize("hasRole('DOCTOR') and @securityService.isNotificationRecipientAuthorized(#notificationId)")
-    public ResponseEntity<SimpleResponse> markNotificationAsRead(@PathVariable Long notificationId) {
-        doctorService.markNotificationAsRead(notificationId);
-        return ResponseEntity.ok(new SimpleResponse(true, "Notification marked as read"));
-    }
-} 
+}

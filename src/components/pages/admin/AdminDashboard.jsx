@@ -11,7 +11,7 @@ import ChartConfigurator from './ChartConfigurator';
 import MedicalRecordsView from './MedicalRecordsView';
 import StaffManagement from './StaffManagement';
 import FinanceManagement from './FinanceManagement';
-import { adminApi } from '../../../services/api';
+import { adminApi } from '../../../services/realtimeApi';
 import "../../../styles/pages/admin/AdminDashboard.css";
 
 const AdminDashboard = () => {

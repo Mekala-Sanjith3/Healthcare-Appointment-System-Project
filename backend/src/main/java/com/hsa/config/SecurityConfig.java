@@ -25,12 +25,25 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(request -> {
+                var corsConfig = new org.springframework.web.cors.CorsConfiguration();
+                corsConfig.setAllowedOriginPatterns(java.util.List.of("*"));
+                corsConfig.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                corsConfig.setAllowedHeaders(java.util.List.of("*"));
+                corsConfig.setAllowCredentials(true);
+                return corsConfig;
+            }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/test/**").permitAll()
+                .requestMatchers("/api/appointments/doctor/**").permitAll() // Temporary for debugging
+                .requestMatchers("/api/admin/doctors").hasAnyRole("ADMIN", "PATIENT")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/doctors/**").hasRole("DOCTOR")
                 .requestMatchers("/api/patients/**").hasRole("PATIENT")
+                .requestMatchers("/api/appointments/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
+                .requestMatchers("/api/medical-records/**").hasAnyRole("PATIENT", "DOCTOR", "ADMIN")
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

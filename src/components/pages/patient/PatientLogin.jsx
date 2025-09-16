@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../common/Button/button";
 import { Input } from "../../common/Input/input";
-import { authApi } from "../../../services/api";
+import { authApi } from "../../../services/realtimeApi";
 import ReCAPTCHA from "react-google-recaptcha";
 import "../../../styles/pages/patient/PatientLogin.css";
 
@@ -180,7 +180,15 @@ const PatientLogin = () => {
             </form>
 
             <div className="login-footer">
-              {/* Registration option removed as per requirements */}
+              <p>Don't have an account? 
+                <button 
+                  type="button" 
+                  className="register-link" 
+                  onClick={() => navigate('/patient-register')}
+                >
+                  Register here
+                </button>
+              </p>
             </div>
 
             <div className="security-note">

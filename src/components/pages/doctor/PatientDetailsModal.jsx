@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { appointmentApi, patientApi } from '../../../services/api';
+import { patientApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/doctor/PatientDetailsModal.css';
 
 const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {

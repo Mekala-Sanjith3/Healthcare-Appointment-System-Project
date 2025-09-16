@@ -239,6 +239,11 @@
   align-items: center;
   gap: 0.5rem;
   transition: var(--transition);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  margin-left: 0.5rem;
 }
 
 .register-link:hover,

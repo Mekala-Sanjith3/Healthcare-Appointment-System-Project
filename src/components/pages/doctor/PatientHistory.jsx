@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doctorApi } from '../../../services/api';
+import { doctorApi } from '../../../services/realtimeApi';
 import PatientSearch from './PatientSearch';
 
 const PatientHistory = () => {

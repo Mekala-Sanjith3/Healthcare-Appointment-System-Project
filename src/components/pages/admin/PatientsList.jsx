@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminApi } from '../../../services/api';
+import { adminApi } from '../../../services/realtimeApi';
 import PatientProfileModal from './PatientProfileModal';
 import '../../../styles/pages/admin/PatientsList.css';
 

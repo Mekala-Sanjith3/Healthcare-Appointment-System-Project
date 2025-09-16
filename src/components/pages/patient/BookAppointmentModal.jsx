@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../../../styles/pages/patient/BookAppointmentModal.css';
-import { doctorApi, appointmentApi, patientApi } from '../../../services/api';
+import { doctorApi, patientApi, appointmentApi } from '../../../services/realtimeApi';
 import PaymentModal from './PaymentModal';
 
 const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointment }) => {
@@ -55,13 +55,35 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
 
     const fetchDoctors = async () => {
       setIsLoading(true);
+      setError(''); // Clear previous errors
       try {
+        console.log("Fetching doctors...");
         const allDoctors = await doctorApi.getAllDoctors();
-        setDoctors(allDoctors);
-        setFilteredDoctors(allDoctors);
+        console.log("Doctors fetched successfully:", allDoctors);
+        
+        if (allDoctors && Array.isArray(allDoctors)) {
+          setDoctors(allDoctors);
+          setFilteredDoctors(allDoctors);
+          if (allDoctors.length === 0) {
+            setError("No doctors available at the moment. Please contact admin.");
+          }
+        } else {
+          console.error("Invalid doctors data format:", allDoctors);
+          setError("Invalid data format received. Please try again.");
+        }
       } catch (error) {
         console.error("Failed to fetch doctors:", error);
-        setError("Failed to load doctors. Please try again.");
+        
+        // More specific error handling
+        if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          setError("Authentication required. Please login again.");
+        } else if (error.message.includes('404')) {
+          setError("Doctors service not available. Please contact support.");
+        } else if (error.message.includes('500')) {
+          setError("Server error. Please try again later.");
+        } else {
+          setError(`Failed to load doctors: ${error.message}`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -211,7 +233,16 @@ const BookAppointmentModal = ({ patientId, patientName, onClose, onAddAppointmen
       };
       
       // Call the API to create the appointment
-      const response = await appointmentApi.createAppointment(appointmentWithPayment);
+      const bookingRequest = {
+        patientId: appointmentWithPayment.patientId,
+        doctorId: appointmentWithPayment.doctorId,
+        appointmentDate: appointmentWithPayment.appointmentDate,
+        appointmentTime: appointmentWithPayment.appointmentTime,
+        appointmentType: appointmentWithPayment.appointmentType,
+        notes: `${appointmentWithPayment.problem || ''} ${appointmentWithPayment.notes || ''}`.trim()
+      };
+      
+      const response = await appointmentApi.bookAppointment(bookingRequest);
       
       console.log('Appointment created successfully:', response);
       

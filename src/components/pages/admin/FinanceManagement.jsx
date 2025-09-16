@@ -13,7 +13,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
-import { paymentApi } from '../../../services/api';
+import { paymentApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/FinanceManagement.css';
 
 // Register Chart.js components

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../../../styles/pages/patient/DoctorSearch.css';
-import { doctorApi } from '../../../services/api'; // Import the doctorApi for API calls
+import { doctorApi } from '../../../services/realtimeApi'; // Import the doctorApi for API calls
 
 const DoctorSearch = () => {
   // State for search/filter params
@@ -38,21 +38,24 @@ const DoctorSearch = () => {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   
   // State for specialties list (for dropdown)
-  const [specialties, setSpecialties] = useState([
-    'Cardiology',
-    'Dermatology',
-    'Endocrinology',
-    'Gastroenterology',
-    'Neurology',
-    'Obstetrics',
-    'Oncology',
-    'Ophthalmology',
-    'Orthopedics',
-    'Pediatrics',
-    'Psychiatry',
-    'Urology'
-  ]);
+  const [specialties, setSpecialties] = useState([]);
   
+  // Function to fetch specializations
+  const fetchSpecializations = async () => {
+    try {
+      const specs = await doctorApi.getSpecializations();
+      setSpecialties(specs);
+    } catch (error) {
+      console.error("Failed to fetch specializations:", error);
+      // Fallback to default specializations
+      setSpecialties([
+        'Cardiology', 'Dermatology', 'Endocrinology', 'Gastroenterology',
+        'Neurology', 'Obstetrics', 'Oncology', 'Ophthalmology',
+        'Orthopedics', 'Pediatrics', 'Psychiatry', 'Urology'
+      ]);
+    }
+  };
+
   // Function to fetch doctors
   const fetchDoctors = async () => {
     setLoading(true);
@@ -183,8 +186,9 @@ const DoctorSearch = () => {
     fetchDoctors();
   }, [pagination.page]);
   
-  // Fetch doctors on component mount
+  // Fetch doctors and specializations on component mount
   useEffect(() => {
+    fetchSpecializations();
     fetchDoctors();
   }, []);
   

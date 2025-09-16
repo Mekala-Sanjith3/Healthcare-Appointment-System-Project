@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../common/Tabs/tabs
 import "../../../styles/pages/doctor/DoctorDashboard.css";
 import "../../../styles/pages/doctor/PatientHistory.css";
 import { Calendar, Clock, Users, FileText, Bell, Settings, LogOut, Brain, History, Star } from "lucide-react";
-import { doctorApi, appointmentApi, medicalRecordsApi } from "../../../services/api";
+import { doctorApi, appointmentApi } from "../../../services/realtimeApi";
 import PatientHistory from "./PatientHistory";
 import DoctorReviews from "./DoctorReviews";
 import AddMedicalRecordModal from './AddMedicalRecordModal';
@@ -53,10 +53,10 @@ const DoctorDashboard = () => {
     specialization: ""
   });
   const [stats, setStats] = useState({
-    totalAppointments: 24,
-    availableHours: 6.5,
-    totalPatients: 1234,
-    reportsDue: 8
+    totalAppointments: 0,
+    availableHours: 0,
+    totalPatients: 0,
+    reportsDue: 0
   });
 
   // For appointment details modal
@@ -121,7 +121,7 @@ const DoctorDashboard = () => {
         // Fetch appointments from the API
         const doctorAppointments = await appointmentApi.getAppointmentsByDoctorId(doctor.id);
         
-        if (doctorAppointments && doctorAppointments.length > 0) {
+        if (doctorAppointments && Array.isArray(doctorAppointments)) {
           console.log("Fetched doctor appointments:", doctorAppointments);
           
           // Deduplicate appointments by ID
@@ -135,51 +135,28 @@ const DoctorDashboard = () => {
           
           setAppointments(uniqueAppointments);
           
-          // Store deduplicated appointments in localStorage to help with patient details modal
-          localStorage.setItem('doctorAppointments', JSON.stringify(uniqueAppointments));
+          // Update stats based on real data
+          setStats(prev => ({
+            ...prev,
+            totalAppointments: uniqueAppointments.length
+          }));
+          
         } else {
           console.log("No appointments found for doctor ID:", doctor.id);
-          // For demo purposes, check mock appointments directly if none found
-          const allMockAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-          
-          // Filter and deduplicate mock appointments
-          const uniqueMockAppointmentsMap = new Map();
-          allMockAppointments.forEach(app => {
-            if (app.doctorId === doctor.id) {
-              uniqueMockAppointmentsMap.set(app.id, app);
-            }
-          });
-          
-          const uniqueMockAppointments = Array.from(uniqueMockAppointmentsMap.values());
-          
-          if (uniqueMockAppointments.length > 0) {
-            console.log("Found mock appointments for doctor:", uniqueMockAppointments);
-            setAppointments(uniqueMockAppointments);
-            localStorage.setItem('doctorAppointments', JSON.stringify(uniqueMockAppointments));
-          }
+          setAppointments([]);
+          setStats(prev => ({
+            ...prev,
+            totalAppointments: 0
+          }));
         }
       } catch (err) {
         console.error("Failed to fetch appointments:", err);
         setError("Failed to load appointments. Please refresh the page.");
-        
-        // Fallback to mock data if API call fails
-        const allMockAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-        
-        // Filter and deduplicate mock appointments
-        const uniqueMockAppointmentsMap = new Map();
-        allMockAppointments.forEach(app => {
-          if (app.doctorId === doctor.id) {
-            uniqueMockAppointmentsMap.set(app.id, app);
-          }
-        });
-        
-        const uniqueMockAppointments = Array.from(uniqueMockAppointmentsMap.values());
-        
-        if (uniqueMockAppointments.length > 0) {
-          console.log("Using mock appointments as fallback:", uniqueMockAppointments);
-          setAppointments(uniqueMockAppointments);
-          localStorage.setItem('doctorAppointments', JSON.stringify(uniqueMockAppointments));
-        }
+        setAppointments([]);
+        setStats(prev => ({
+          ...prev,
+          totalAppointments: 0
+        }));
       } finally {
         setIsLoading(prev => ({ ...prev, appointments: false }));
       }
@@ -542,9 +519,18 @@ const DoctorDashboard = () => {
     switch (activeTab) {
       case "appointments":
         const today = new Date().toISOString().split('T')[0];
-        const todayAppointments = appointments.filter(
-          appointment => appointment.appointmentDate === today
-        );
+        const todayAppointments = appointments.filter(appointment => {
+          // Handle different date formats from backend
+          let appointmentDate;
+          if (Array.isArray(appointment.appointmentDate)) {
+            // Format: [2025, 9, 15] -> "2025-09-15"
+            const [year, month, day] = appointment.appointmentDate;
+            appointmentDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          } else {
+            appointmentDate = appointment.appointmentDate;
+          }
+          return appointmentDate === today;
+        });
 
         return (
           <>
@@ -613,10 +599,20 @@ const DoctorDashboard = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {todayAppointments.map((appointment) => (
+                      {todayAppointments.map((appointment) => {
+                        // Format time for display
+                        let displayTime;
+                        if (Array.isArray(appointment.appointmentTime)) {
+                          const [hour, minute] = appointment.appointmentTime;
+                          displayTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        } else {
+                          displayTime = appointment.appointmentTime;
+                        }
+                        
+                        return (
                         <TableRow key={appointment.id}>
-                          <TableCell>{appointment.appointmentTime}</TableCell>
-                          <TableCell>{appointment.patientName}</TableCell>
+                          <TableCell>{displayTime}</TableCell>
+                          <TableCell>{appointment.patientName || `Patient ID: ${appointment.patientId}`}</TableCell>
                           <TableCell>{appointment.appointmentType}</TableCell>
                           <TableCell>
                             <span className={`status ${appointment.status.toLowerCase()}`}>
@@ -669,7 +665,8 @@ const DoctorDashboard = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 ) : (
@@ -698,19 +695,69 @@ const DoctorDashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {appointments
-                        .filter(appointment => appointment.appointmentDate >= today)
+                        .filter(appointment => {
+                          // Handle different date formats for upcoming appointments
+                          let appointmentDate;
+                          if (Array.isArray(appointment.appointmentDate)) {
+                            const [year, month, day] = appointment.appointmentDate;
+                            appointmentDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                          } else {
+                            appointmentDate = appointment.appointmentDate;
+                          }
+                          return appointmentDate >= today;
+                        })
                         .sort((a, b) => {
                           // Sort by date first, then by time
-                          const dateComparison = a.appointmentDate.localeCompare(b.appointmentDate);
+                          let dateA, dateB;
+                          if (Array.isArray(a.appointmentDate)) {
+                            const [year, month, day] = a.appointmentDate;
+                            dateA = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                          } else {
+                            dateA = a.appointmentDate;
+                          }
+                          if (Array.isArray(b.appointmentDate)) {
+                            const [year, month, day] = b.appointmentDate;
+                            dateB = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                          } else {
+                            dateB = b.appointmentDate;
+                          }
+                          
+                          const dateComparison = dateA.localeCompare(dateB);
                           if (dateComparison !== 0) return dateComparison;
-                          return a.appointmentTime.localeCompare(b.appointmentTime);
+                          
+                          // Handle time comparison
+                          let timeA = Array.isArray(a.appointmentTime) ? 
+                            `${a.appointmentTime[0].toString().padStart(2, '0')}:${a.appointmentTime[1].toString().padStart(2, '0')}` : 
+                            a.appointmentTime;
+                          let timeB = Array.isArray(b.appointmentTime) ? 
+                            `${b.appointmentTime[0].toString().padStart(2, '0')}:${b.appointmentTime[1].toString().padStart(2, '0')}` : 
+                            b.appointmentTime;
+                          
+                          return timeA.localeCompare(timeB);
                         })
-                        .map((appointment) => (
+                        .map((appointment) => {
+                          // Format date and time for display
+                          let displayDate, displayTime;
+                          if (Array.isArray(appointment.appointmentDate)) {
+                            const [year, month, day] = appointment.appointmentDate;
+                            displayDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                          } else {
+                            displayDate = appointment.appointmentDate;
+                          }
+                          
+                          if (Array.isArray(appointment.appointmentTime)) {
+                            const [hour, minute] = appointment.appointmentTime;
+                            displayTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                          } else {
+                            displayTime = appointment.appointmentTime;
+                          }
+                          
+                          return (
                           <TableRow key={appointment.id}>
                             <TableCell>
-                              {appointment.appointmentDate} {appointment.appointmentTime}
+                              {displayDate} {displayTime}
                             </TableCell>
-                            <TableCell>{appointment.patientName}</TableCell>
+                            <TableCell>{appointment.patientName || `Patient ID: ${appointment.patientId}`}</TableCell>
                             <TableCell>{appointment.appointmentType}</TableCell>
                             <TableCell>
                               <span className={`status ${appointment.status.toLowerCase()}`}>
@@ -763,7 +810,8 @@ const DoctorDashboard = () => {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 ) : (

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../../../services/api";
+import { authApi } from "../../../services/realtimeApi";
 import ReCAPTCHA from "react-google-recaptcha";
 import "../../../styles/pages/admin/AdminLogin.css";
 

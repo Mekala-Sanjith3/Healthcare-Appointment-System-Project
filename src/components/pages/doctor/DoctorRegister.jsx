@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../../../services/api";
+import { authApi } from "../../../services/realtimeApi";
 import "../../../styles/pages/doctor/DoctorRegister.css";
 
 const DoctorRegister = () => {

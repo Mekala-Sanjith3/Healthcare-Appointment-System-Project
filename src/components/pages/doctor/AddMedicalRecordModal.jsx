@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { medicalRecordsApi } from '../../../services/api';
+import { medicalRecordsApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/doctor/AddMedicalRecordModal.css';
 
 const AddMedicalRecordModal = ({ isOpen, onClose, appointment, onRecordAdded }) => {
