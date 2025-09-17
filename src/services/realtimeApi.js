@@ -186,6 +186,40 @@ export const adminApi = {
             body: JSON.stringify(doctorData)
         });
         return handleResponse(response);
+    },
+
+    updateDoctor: async (doctorId, doctorData) => {
+        const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(doctorData)
+        });
+        return handleResponse(response);
+    },
+
+    deleteDoctor: async (doctorId) => {
+        const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        return handleResponse(response);
+    },
+
+    updatePatient: async (patientId, patientData) => {
+        const response = await fetch(`${API_BASE_URL}/admin/patients/${patientId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(patientData)
+        });
+        return handleResponse(response);
+    },
+
+    deletePatient: async (patientId) => {
+        const response = await fetch(`${API_BASE_URL}/admin/patients/${patientId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        return handleResponse(response);
     }
 };
 

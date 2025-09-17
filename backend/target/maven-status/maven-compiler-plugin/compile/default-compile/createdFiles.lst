@@ -3,7 +3,6 @@ com\hsa\dto\AvailabilityDTO$DaySchedule.class
 com\hsa\model\Patient.class
 com\hsa\dto\AdminRegistrationRequest.class
 com\hsa\dto\DoctorRegistrationRequest.class
-com\hsa\config\CorsFilter.class
 com\hsa\dto\MedicalRecordRequest.class
 com\hsa\dto\PatientRegistrationRequest.class
 com\hsa\service\impl\DoctorServiceImpl.class

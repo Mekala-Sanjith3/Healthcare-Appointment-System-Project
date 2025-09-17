@@ -4,7 +4,6 @@ C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\h
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\HealthcareAppointmentSystemApplication.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\impl\DoctorServiceImpl.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\UpdateDoctorRequest.java
-C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\CorsFilter.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\Doctor.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\AdminRegistrationRequest.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\AppointmentController.java
@@ -21,7 +20,6 @@ C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\h
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\SecurityService.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\User.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\exception\ResourceNotFoundException.java
-C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\SimpleAuthController.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\CreateDoctorRequest.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\DoctorResponse.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\PatientCreationRequest.java

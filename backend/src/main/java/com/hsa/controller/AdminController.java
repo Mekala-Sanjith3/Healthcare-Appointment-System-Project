@@ -175,6 +175,121 @@ public class AdminController {
         }
     }
 
+    @PutMapping("/doctors/{doctorId}")
+    public ResponseEntity<Doctor> updateDoctor(@PathVariable String doctorId, @RequestBody DoctorCreationRequest request) {
+        try {
+            // Find existing doctor
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Check if email is being changed and if new email already exists
+            if (!doctor.getEmail().equals(request.getEmail()) && doctorRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Update doctor fields
+            doctor.setName(request.getName());
+            doctor.setEmail(request.getEmail());
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+                doctor.setPassword(passwordEncoder.encode(request.getPassword()));
+            }
+            doctor.setSpecialization(request.getSpecialization());
+            doctor.setPhoneNumber(request.getPhoneNumber());
+            doctor.setAddress(request.getAddress());
+            doctor.setExperience(request.getExperience().toString());
+            doctor.setQualification(request.getQualification());
+            doctor.setConsultationFee(request.getConsultationFee());
+
+            Doctor updatedDoctor = doctorRepository.save(doctor);
+            return ResponseEntity.ok(updatedDoctor);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @DeleteMapping("/doctors/{doctorId}")
+    public ResponseEntity<Map<String, String>> deleteDoctor(@PathVariable String doctorId) {
+        try {
+            // Check if doctor exists
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Delete the doctor
+            doctorRepository.deleteById(doctorId);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Doctor deleted successfully");
+            response.put("doctorId", doctorId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to delete doctor");
+            error.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @PutMapping("/patients/{patientId}")
+    public ResponseEntity<Patient> updatePatient(@PathVariable Long patientId, @RequestBody PatientCreationRequest request) {
+        try {
+            // Find existing patient
+            Patient patient = patientRepository.findById(patientId).orElse(null);
+            if (patient == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Check if email is being changed and if new email already exists
+            if (!patient.getEmail().equals(request.getEmail()) && patientRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Update patient fields
+            patient.setName(request.getName());
+            patient.setEmail(request.getEmail());
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+                patient.setPassword(passwordEncoder.encode(request.getPassword()));
+            }
+            patient.setPhoneNumber(request.getPhoneNumber());
+            patient.setAddress(request.getAddress());
+            patient.setBloodGroup(request.getBloodGroup());
+            patient.setAge(request.getAge());
+            patient.setGender(request.getGender());
+
+            Patient updatedPatient = patientRepository.save(patient);
+            return ResponseEntity.ok(updatedPatient);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @DeleteMapping("/patients/{patientId}")
+    public ResponseEntity<Map<String, String>> deletePatient(@PathVariable Long patientId) {
+        try {
+            // Check if patient exists
+            Patient patient = patientRepository.findById(patientId).orElse(null);
+            if (patient == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Delete the patient
+            patientRepository.deleteById(patientId);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Patient deleted successfully");
+            response.put("patientId", patientId.toString());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to delete patient");
+            error.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
     private String generateDoctorId() {
         return "DOC_" + System.currentTimeMillis();
     }
