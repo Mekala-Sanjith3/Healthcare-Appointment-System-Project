@@ -78,11 +78,37 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/patients/{patientId}")
+    public ResponseEntity<Patient> getPatientById(@PathVariable Long patientId) {
+        try {
+            Patient patient = patientRepository.findById(patientId).orElse(null);
+            if (patient == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(patient);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/doctors")
     public ResponseEntity<List<Doctor>> getAllDoctors() {
         try {
             List<Doctor> doctors = doctorRepository.findAll();
             return ResponseEntity.ok(doctors);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/doctors/{doctorId}")
+    public ResponseEntity<Doctor> getDoctorById(@PathVariable String doctorId) {
+        try {
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(doctor);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

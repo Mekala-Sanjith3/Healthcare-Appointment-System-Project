@@ -220,6 +220,47 @@ export const adminApi = {
             headers: getAuthHeaders()
         });
         return handleResponse(response);
+    },
+
+    getDoctorById: async (doctorId) => {
+        try {
+            // Try the admin endpoint first
+            const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}`, {
+                headers: getAuthHeaders()
+            });
+            return handleResponse(response);
+        } catch (error) {
+            console.log('Falling back to public endpoint for doctor:', error.message);
+            // Fallback to public endpoint and filter by ID
+            const allDoctors = await doctorApi.getAllDoctors();
+            const doctor = allDoctors.find(d => d.id === doctorId);
+            if (!doctor) {
+                throw new Error('Doctor not found');
+            }
+            return doctor;
+        }
+    },
+
+    getPatientById: async (patientId) => {
+        try {
+            // Try the admin endpoint first
+            const response = await fetch(`${API_BASE_URL}/admin/patients/${patientId}`, {
+                headers: getAuthHeaders()
+            });
+            return handleResponse(response);
+        } catch (error) {
+            console.log('Falling back to test endpoint for patient:', error.message);
+            // Fallback to test endpoint and filter by ID
+            const testResponse = await fetch(`${API_BASE_URL}/test/all-users`, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await handleResponse(testResponse);
+            const patient = data.patients?.find(p => p.id == patientId);
+            if (!patient) {
+                throw new Error('Patient not found');
+            }
+            return patient;
+        }
     }
 };
 

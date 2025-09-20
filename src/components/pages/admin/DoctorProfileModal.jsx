@@ -27,6 +27,18 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
     }
   }, [isOpen, doctorId]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [isOpen]);
+
   const fetchDoctorDetails = async () => {
     try {
       const data = await adminApi.getDoctorById(doctorId);
@@ -96,8 +108,40 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="doctor-profile-modal">
-      <div className="modal-content">
+    <div 
+      className="doctor-profile-modal"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 10000,
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose(false);
+        }
+      }}
+    >
+      <div 
+        className="modal-content"
+        style={{
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          margin: 'auto',
+          position: 'relative'
+        }}
+      >
         <div className="modal-header">
           <h2>{isEditing ? 'Edit Doctor Profile' : 'Doctor Profile'}</h2>
           <button className="close-button" onClick={() => onClose(false)}>

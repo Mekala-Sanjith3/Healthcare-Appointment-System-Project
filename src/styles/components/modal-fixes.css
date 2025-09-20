@@ -1,0 +1,99 @@
+/* Universal Modal Fixes */
+
+/* Ensure modals are always properly centered and visible */
+.doctor-profile-modal,
+.patient-profile-modal,
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  overflow: auto !important;
+}
+
+/* More specific targeting for doctor profile modal */
+div.doctor-profile-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  padding: 20px !important;
+}
+
+/* More specific targeting for patient profile modal */
+div.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  padding: 20px !important;
+}
+
+/* Ensure modal content is properly sized and scrollable */
+.doctor-profile-modal .modal-content,
+.patient-profile-modal .modal-container {
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  width: auto !important;
+  margin: auto !important;
+  position: relative !important;
+  overflow-y: auto !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden !important;
+}
+
+/* Responsive modal sizing */
+@media (max-width: 768px) {
+  .doctor-profile-modal .modal-content,
+  .patient-profile-modal .modal-container {
+    max-width: 95vw !important;
+    max-height: 95vh !important;
+    margin: 10px !important;
+  }
+}
+
+/* Fix for overlapping elements */
+.admin-dashboard-container {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-sidebar {
+  z-index: 100 !important;
+}
+
+.dashboard-main {
+  z-index: 10 !important;
+}

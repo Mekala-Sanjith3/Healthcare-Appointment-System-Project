@@ -8,19 +8,23 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .modal-container {
   background-color: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   width: 90%;
   max-width: 900px;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
+  margin: auto;
 }
 
 .patient-profile-modal .modal-header {
