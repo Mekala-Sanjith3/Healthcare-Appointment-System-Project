@@ -12,6 +12,30 @@ dist
 dist-ssr
 *.local
 
+# Vite cache
+.vite/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Java/Maven
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+
+# API Gateway runtime
+api-gateway/logs/
+api-gateway/*.log
+
+# Docker
+*.pid
+
+# Coverage
+coverage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

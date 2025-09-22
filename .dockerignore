@@ -1,0 +1,35 @@
+# General
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# Node/React
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store
+
+# Build outputs
+build
+.dist
+dist
+coverage
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Backend Java
+backend/target
+backend/.mvn
+backend/mvnw
+backend/mvnw.cmd
+
+# API Gateway runtime
+api-gateway/logs
+api-gateway/*.log

@@ -128,3 +128,31 @@ This project is set up with CI/CD using GitHub Actions for automated deployment.
 ### Deployment Process
 
 For detailed instructions on the CI/CD process and manual deployment options, please see the [DEPLOYMENT.md](DEPLOYMENT.md) file.
+
+## 🐳 Docker Compose (Local Full-Stack)
+
+Prerequisites: Docker Desktop 4.x+
+
+Build and run all services:
+
+```bash
+docker compose up -d --build
+```
+
+Services:
+- Frontend: http://localhost
+- API Gateway: http://localhost:8000
+- Backend (Spring Boot): http://localhost:8082
+- MySQL: localhost:3306 (user: root, pass: root)
+
+Useful commands:
+```bash
+docker compose logs -f
+docker compose ps
+docker compose down -v
+```
+
+Environment:
+- Backend reads DB via `SPRING_DATASOURCE_*` (set in docker-compose.yml)
+- API Gateway proxies `/api/*` to `http://backend:8082`
+- Frontend Nginx proxies `/api/*` to API Gateway

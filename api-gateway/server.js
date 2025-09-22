@@ -49,9 +49,7 @@ app.use(authenticateJWT);
 const apiProxy = createProxyMiddleware({
   target: process.env.API_SERVICE_URL || 'http://localhost:8080',
   changeOrigin: true,
-  pathRewrite: {
-    '^/api': '', // remove /api prefix when forwarding to target
-  },
+  // Keep '/api' prefix so requests align with Spring Boot routes (e.g., /api/auth)
   onProxyReq: (proxyReq, req, res) => {
     // Log the proxied request
     logger.info(`Proxying request [${req.method}]: ${req.path}`);
