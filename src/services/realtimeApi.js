@@ -114,7 +114,43 @@ export const authApi = {
     },
 
     registerPatient: async (patientData) => {
-        return authApi.register(patientData, 'patient');
+        try {
+            console.log(`Attempting to register patient with data:`, patientData);
+            
+            const response = await fetch(`${API_BASE_URL}/auth/register/patient`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(patientData)
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Registration failed with status ${response.status}:`, errorText);
+                throw new Error(`Registration failed: ${errorText || 'Unknown error'}`);
+            }
+            
+            const data = await response.json();
+            console.log(`Patient registration successful:`, data);
+            
+            // Store authentication data
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('userRole', data.role);
+            localStorage.setItem('userId', data.userId);
+            localStorage.setItem('userEmail', data.email);
+            
+            return {
+                success: true,
+                token: data.token,
+                email: data.email,
+                role: data.role,
+                userId: data.userId
+            };
+        } catch (error) {
+            console.error('Registration failed:', error.message);
+            throw error;
+        }
     },
 
     registerDoctor: async (doctorData) => {
@@ -149,8 +185,39 @@ export const adminApi = {
         return handleResponse(response);
     },
 
-    getAllAppointments: async () => {
+    getAllAppointments: async (params = {}) => {
+        const qs = new URLSearchParams();
+        if (params.status) qs.append('status', params.status);
+        if (params.date) qs.append('date', params.date);
+        if (params.search) qs.append('search', params.search);
+        const query = qs.toString() ? `?${qs.toString()}` : '';
+        const response = await fetch(`${API_BASE_URL}/admin/appointments${query}`, {
+            headers: getAuthHeaders()
+        });
+        return handleResponse(response);
+    },
+
+    createAppointment: async (appointment) => {
         const response = await fetch(`${API_BASE_URL}/admin/appointments`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(appointment)
+        });
+        return handleResponse(response);
+    },
+
+    updateAppointment: async (appointmentId, appointment) => {
+        const response = await fetch(`${API_BASE_URL}/admin/appointments/${appointmentId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(appointment)
+        });
+        return handleResponse(response);
+    },
+
+    deleteAppointment: async (appointmentId) => {
+        const response = await fetch(`${API_BASE_URL}/admin/appointments/${appointmentId}`, {
+            method: 'DELETE',
             headers: getAuthHeaders()
         });
         return handleResponse(response);
@@ -261,6 +328,24 @@ export const adminApi = {
             }
             return patient;
         }
+    },
+
+    updateDoctorStatus: async (doctorId, status) => {
+        const response = await fetch(`${API_BASE_URL}/admin/doctors/${doctorId}/status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status })
+        });
+        return handleResponse(response);
+    },
+
+    updatePatientStatus: async (patientId, status) => {
+        const response = await fetch(`${API_BASE_URL}/admin/patients/${patientId}/status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status })
+        });
+        return handleResponse(response);
     }
 };
 
@@ -343,16 +428,51 @@ export const doctorApi = {
     },
 
     getDoctorAvailability: async (doctorId) => {
-        // For now, return default availability
-        return {
-            monday: { available: true, startTime: '09:00', endTime: '17:00' },
-            tuesday: { available: true, startTime: '09:00', endTime: '17:00' },
-            wednesday: { available: true, startTime: '09:00', endTime: '17:00' },
-            thursday: { available: true, startTime: '09:00', endTime: '17:00' },
-            friday: { available: true, startTime: '09:00', endTime: '17:00' },
-            saturday: { available: false, startTime: '09:00', endTime: '17:00' },
-            sunday: { available: false, startTime: '09:00', endTime: '17:00' }
-        };
+        const defaults = () => ({
+            monday: { start: '09:00', end: '17:00', isAvailable: true },
+            tuesday: { start: '09:00', end: '17:00', isAvailable: true },
+            wednesday: { start: '09:00', end: '17:00', isAvailable: true },
+            thursday: { start: '09:00', end: '17:00', isAvailable: true },
+            friday: { start: '09:00', end: '17:00', isAvailable: true },
+            saturday: { start: '09:00', end: '13:00', isAvailable: false },
+            sunday: { start: '09:00', end: '13:00', isAvailable: false }
+        });
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/availability`, {
+                headers: getAuthHeaders()
+            });
+            const data = await handleResponse(response);
+            const raw = data?.availabilitySchedule;
+            if (!raw) return defaults();
+            let parsed = {};
+            try { parsed = JSON.parse(raw); } catch { return defaults(); }
+            // Normalize any legacy keys
+            Object.keys(parsed || {}).forEach(day => {
+                const v = parsed[day] || {};
+                parsed[day] = {
+                    start: v.start || v.startTime || '09:00',
+                    end: v.end || v.endTime || '17:00',
+                    isAvailable: typeof v.isAvailable === 'boolean' ? v.isAvailable : !!v.available
+                };
+            });
+            // Ensure all days exist
+            return { ...defaults(), ...parsed };
+        } catch (e) {
+            return defaults();
+        }
+    },
+
+    updateDoctorAvailability: async (doctorId, availability) => {
+        const response = await fetch(`${API_BASE_URL}/doctors/${doctorId}/availability`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ availabilitySchedule: JSON.stringify(availability) })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to save availability');
+        }
+        return true;
     },
 
     getDoctorNotifications: async (doctorId) => {
@@ -499,21 +619,31 @@ export const patientApi = {
 
     getPatientProfile: async (patientId) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/patients/${patientId}/profile`, {
-                headers: getAuthHeaders()
-            });
-            return handleResponse(response);
-        } catch (error) {
-            // Fallback: try to get patient from test endpoint
-            console.log('Falling back to test endpoint for patient profile:', error.message);
-            const fallbackResponse = await fetch(`${API_BASE_URL}/test/all-users`, {
+            // Use test endpoint as primary method for now
+            console.log('Fetching patient profile for ID:', patientId);
+            const response = await fetch(`${API_BASE_URL}/test/all-users`, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
-            const data = await handleResponse(fallbackResponse);
+            const data = await handleResponse(response);
             const patient = data.patients?.find(p => p.id == patientId);
-            return patient || null;
+            if (patient) {
+                console.log('Found patient:', patient);
+                return patient;
+            } else {
+                console.log('Patient not found in patients array, checking users array');
+                // If not found in patients array, check users array for patient role
+                const userPatient = data.users?.find(u => u.id == patientId && u.role === 'PATIENT');
+                if (userPatient) {
+                    console.log('Found patient in users array:', userPatient);
+                    return userPatient;
+                }
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching patient profile:', error);
+            return null;
         }
     }
 };
@@ -600,11 +730,55 @@ export const appointmentApi = {
 
 // Medical Records API
 export const medicalRecordsApi = {
+    getAllRecords: async ({ search, dateFrom, dateTo } = {}) => {
+        const qs = new URLSearchParams();
+        if (search) qs.append('search', search);
+        if (dateFrom) qs.append('dateFrom', dateFrom);
+        if (dateTo) qs.append('dateTo', dateTo);
+        const query = qs.toString() ? `?${qs.toString()}` : '';
+        const response = await fetch(`${API_BASE_URL}/medical-records${query}`, {
+            headers: getAuthHeaders()
+        });
+        return handleResponse(response);
+    },
     getPatientRecords: async (patientId) => {
         const response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}`, {
             headers: getAuthHeaders()
         });
         return handleResponse(response);
+    },
+
+    getPatientMedicalHistory: async (patientId) => {
+        try {
+            console.log('Fetching medical history for patient:', patientId);
+            const response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}`, {
+                headers: getAuthHeaders()
+            });
+            const result = await handleResponse(response);
+            console.log('Medical history API response:', result);
+            return result;
+        } catch (error) {
+            console.error('Error fetching medical history:', error);
+            throw error;
+        }
+    },
+
+    searchMedicalRecords: async (patientId, query) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/medical-records/patient/${patientId}?search=${encodeURIComponent(query)}`, {
+                headers: getAuthHeaders()
+            });
+            return handleResponse(response);
+        } catch (error) {
+            console.error('Error searching medical records:', error);
+            return [];
+        }
+    },
+
+    debugLocalStorage: (patientId) => {
+        console.log('Debug localStorage for patient:', patientId);
+        console.log('Token:', localStorage.getItem('token'));
+        console.log('User data:', localStorage.getItem('userData'));
     },
 
     addMedicalRecord: async (recordData) => {
@@ -633,6 +807,42 @@ export const medicalRecordsApi = {
     }
 };
 
+// Staff API for admin portal
+export const staffApi = {
+    getAll: async () => {
+        const response = await fetch(`${API_BASE_URL}/staff`, {
+            headers: getAuthHeaders()
+        });
+        return handleResponse(response);
+    },
+    create: async (staff) => {
+        const response = await fetch(`${API_BASE_URL}/staff`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(staff)
+        });
+        return handleResponse(response);
+    },
+    update: async (id, staff) => {
+        const response = await fetch(`${API_BASE_URL}/staff/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(staff)
+        });
+        return handleResponse(response);
+    },
+    delete: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/staff/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!response.ok && response.status !== 204) {
+            throw new Error('Failed to delete staff');
+        }
+        return true;
+    }
+};
+
 // Reviews API
 export const reviewsApi = {
     getDoctorReviews: async (doctorId) => {
@@ -651,6 +861,31 @@ export const reviewsApi = {
         return handleResponse(response);
     },
 
+    createReview: async (reviewData) => {
+        // alias used by PatientDashboard
+        return reviewsApi.addReview(reviewData);
+    },
+
+    getPatientPastDoctors: async (patientId) => {
+        try {
+            // Build from the patient's past appointments
+            const apps = await appointmentApi.getAppointmentsByPatientId(patientId);
+            const byDoctor = new Map();
+            for (const a of apps || []) {
+                const key = String(a.doctorId || '');
+                if (!key) continue;
+                const name = a.doctorName || `Doctor ${key}`;
+                const specialty = a.doctorSpecialization || 'General Medicine';
+                const lastDate = Array.isArray(a.appointmentDate) ? `${a.appointmentDate[0]}-${String(a.appointmentDate[1]).padStart(2,'0')}-${String(a.appointmentDate[2]).padStart(2,'0')}` : (a.appointmentDate || '');
+                byDoctor.set(key, { id: key, name, specialty, lastAppointmentDate: lastDate });
+            }
+            return Array.from(byDoctor.values());
+        } catch (e) {
+            console.error('Failed to build patient past doctors:', e);
+            return [];
+        }
+    },
+
     getPatientReviews: async (patientId) => {
         const response = await fetch(`${API_BASE_URL}/reviews/patient/${patientId}`, {
             headers: getAuthHeaders()
@@ -661,24 +896,20 @@ export const reviewsApi = {
 
 // Payment API
 export const paymentApi = {
-    processPayment: async (paymentData) => {
-        const response = await fetch(`${API_BASE_URL}/payments/process`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(paymentData)
-        });
-        return handleResponse(response);
-    },
-
-    getPaymentHistory: async (userId) => {
-        const response = await fetch(`${API_BASE_URL}/payments/history/${userId}`, {
+    getAll: async ({ from, to } = {}) => {
+        const qs = new URLSearchParams();
+        if (from) qs.append('from', from);
+        if (to) qs.append('to', to);
+        const response = await fetch(`${API_BASE_URL}/finance/payments${qs.toString() ? `?${qs.toString()}` : ''}`, {
             headers: getAuthHeaders()
         });
         return handleResponse(response);
     },
-
-    getPaymentStats: async () => {
-        const response = await fetch(`${API_BASE_URL}/payments/stats`, {
+    getSummary: async ({ from, to }) => {
+        const qs = new URLSearchParams();
+        qs.append('from', from);
+        qs.append('to', to);
+        const response = await fetch(`${API_BASE_URL}/finance/summary?${qs.toString()}`, {
             headers: getAuthHeaders()
         });
         return handleResponse(response);

@@ -9,6 +9,8 @@ import AddPatientModal from './AddPatientModal';
 import AddAppointmentModal from './AddAppointmentModal';
 import ChartConfigurator from './ChartConfigurator';
 import MedicalRecordsView from './MedicalRecordsView';
+import AddMedicalRecordModal from './AddMedicalRecordModal';
+import AddStaffModal from './AddStaffModal';
 import StaffManagement from './StaffManagement';
 import FinanceManagement from './FinanceManagement';
 import { adminApi } from '../../../services/realtimeApi';
@@ -44,6 +46,10 @@ const AdminDashboard = () => {
     department: ''
   });
   const [refreshAppointments, setRefreshAppointments] = useState(0);
+  const [refreshStaff, setRefreshStaff] = useState(0);
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [modalPatients, setModalPatients] = useState([]);
+  const [modalDoctors, setModalDoctors] = useState([]);
 
   // Verify authentication on load
   useEffect(() => {
@@ -61,6 +67,27 @@ const AdminDashboard = () => {
     localStorage.removeItem('userRole');
     navigate('/admin-login');
   };
+
+  // Load patients/doctors when Add Medical Record modal opens
+  useEffect(() => {
+    const loadLists = async () => {
+      try {
+        const [patients, doctors] = await Promise.all([
+          adminApi.getAllPatients(),
+          adminApi.getAllDoctors()
+        ]);
+        setModalPatients(Array.isArray(patients) ? patients : []);
+        setModalDoctors(Array.isArray(doctors) ? doctors : []);
+      } catch (e) {
+        console.error('Failed to load patients/doctors for modal', e);
+        setModalPatients([]);
+        setModalDoctors([]);
+      }
+    };
+    if (showAddMedicalRecordModal) {
+      loadLists();
+    }
+  }, [showAddMedicalRecordModal]);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -247,7 +274,7 @@ const AdminDashboard = () => {
             {activeTab === 'staff' && (
               <button 
                 className="add-button"
-                onClick={() => {/* Add staff handler */}}
+                onClick={() => setShowAddStaffModal(true)}
               >
                 <i className="fas fa-plus"></i>
                 Add New Staff Member
@@ -488,6 +515,7 @@ const AdminDashboard = () => {
               <StaffManagement 
                 searchTerm={searchTerm}
                 filters={staffFilters}
+                refreshTrigger={refreshStaff}
               />
             </div>
           )}
@@ -609,6 +637,25 @@ const AdminDashboard = () => {
           isOpen={showAddAppointmentModal}
           onClose={() => setShowAddAppointmentModal(false)}
           onAdd={handleAddAppointment}
+        />
+
+        <AddMedicalRecordModal
+          isOpen={showAddMedicalRecordModal}
+          onClose={() => setShowAddMedicalRecordModal(false)}
+          onAdd={() => {
+            setShowAddMedicalRecordModal(false);
+          }}
+          patients={modalPatients}
+          doctors={modalDoctors}
+        />
+
+        <AddStaffModal
+          isOpen={showAddStaffModal}
+          onClose={() => setShowAddStaffModal(false)}
+          onAdd={() => {
+            setShowAddStaffModal(false);
+            setRefreshStaff(prev => prev + 1);
+          }}
         />
       </main>
     </div>

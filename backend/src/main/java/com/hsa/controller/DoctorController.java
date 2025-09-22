@@ -44,20 +44,14 @@ public class DoctorController {
             List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
             
             // Extract unique patient IDs
-            List<String> patientIds = appointments.stream()
+            List<Long> patientIds = appointments.stream()
                 .map(Appointment::getPatientId)
                 .distinct()
                 .collect(Collectors.toList());
             
             // Get patient details
             List<Patient> patients = patientIds.stream()
-                .map(patientId -> {
-                    try {
-                        return patientRepository.findById(Long.parseLong(patientId)).orElse(null);
-                    } catch (NumberFormatException e) {
-                        return null;
-                    }
-                })
+                .map(patientId -> patientRepository.findById(patientId).orElse(null))
                 .filter(patient -> patient != null)
                 .collect(Collectors.toList());
             
@@ -113,6 +107,38 @@ public class DoctorController {
                 return ResponseEntity.notFound().build();
             }
             return ResponseEntity.ok(doctor);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/{doctorId}/availability")
+    public ResponseEntity<Map<String, Object>> getAvailability(@PathVariable String doctorId) {
+        try {
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+            Map<String, Object> result = new HashMap<>();
+            result.put("availabilitySchedule", doctor.getAvailabilitySchedule());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PutMapping("/{doctorId}/availability")
+    public ResponseEntity<Void> updateAvailability(@PathVariable String doctorId, @RequestBody Map<String, Object> payload) {
+        try {
+            Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+            if (doctor == null) {
+                return ResponseEntity.notFound().build();
+            }
+            Object schedule = payload.get("availabilitySchedule");
+            // Persist raw JSON string to allow flexible schema
+            doctor.setAvailabilitySchedule(schedule != null ? schedule.toString() : null);
+            doctorRepository.save(doctor);
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

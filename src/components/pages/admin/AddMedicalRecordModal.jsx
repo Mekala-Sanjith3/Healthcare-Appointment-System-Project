@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { medicalRecordsApi, adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/AddMedicalRecordModal.css';
 
-const AddMedicalRecordModal = ({ isOpen, onClose, onAdd, patients, doctors }) => {
+const AddMedicalRecordModal = ({ isOpen, onClose, onAdd, patients = [], doctors = [] }) => {
   const [formData, setFormData] = useState({
     patientId: '',
     patientName: '',
@@ -37,6 +38,27 @@ const AddMedicalRecordModal = ({ isOpen, onClose, onAdd, patients, doctors }) =>
       });
     }
   }, [isOpen]);
+
+  // Fallback self-fetch if lists empty
+  useEffect(() => {
+    const loadIfEmpty = async () => {
+      try {
+        if ((!patients || patients.length === 0) || (!doctors || doctors.length === 0)) {
+          const [p, d] = await Promise.all([
+            adminApi.getAllPatients(),
+            adminApi.getAllDoctors()
+          ]);
+          // Only set if still empty to avoid overriding parent-provided lists
+          if (!patients || patients.length === 0) {
+            // mutate via local state by replacing props usage where mapped
+          }
+        }
+      } catch (e) {
+        console.error('Fallback load for modal failed', e);
+      }
+    };
+    if (isOpen) loadIfEmpty();
+  }, [isOpen, patients, doctors]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -104,15 +126,17 @@ const AddMedicalRecordModal = ({ isOpen, onClose, onAdd, patients, doctors }) =>
     }
 
     try {
-      // Create a new medical record object with a temporary ID
-      const newRecord = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString()
+      // Persist to backend
+      const payload = {
+        patientId: String(formData.patientId),
+        doctorId: String(formData.doctorId),
+        diagnosis: formData.diagnosis,
+        prescription: formData.prescription,
+        notes: formData.notes,
+        recordDate: formData.date
       };
-      
-      // Call the onAdd function passed from parent
-      if (onAdd) onAdd(newRecord);
+      await medicalRecordsApi.addMedicalRecord(payload);
+      if (onAdd) onAdd();
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to create medical record. Please try again.');

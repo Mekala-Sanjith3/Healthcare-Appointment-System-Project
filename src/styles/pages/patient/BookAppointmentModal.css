@@ -1,13 +1,11 @@
 .book-appointment-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  justify-items: center;      /* explicit horizontal centering */
+  align-content: center;      /* explicit vertical centering */
   z-index: 3000;
   animation: fadeIn 0.3s ease-in-out;
   overflow-y: auto;
@@ -19,16 +17,17 @@
   to { opacity: 1; }
 }
 
-.modal-content {
+.book-appointment-modal .modal-content {
   background-color: white;
   border-radius: 12px;
-  width: 90%;
-  max-width: 900px;
+  width: min(900px, 90vw);
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   animation: slideUp 0.3s ease-in-out;
   position: relative;
+  margin: 0;                 /* rely on grid centering from overlay */
+  justify-self: center;      /* explicit center in grid */
 }
 
 @keyframes slideUp {
@@ -42,6 +41,9 @@
   align-items: center;
   padding: 20px;
   border-bottom: 1px solid #eaecef;
+  background: #fff;              /* same as body for square look */
+  border-top-left-radius: 12px;  /* match card radius */
+  border-top-right-radius: 12px;
 }
 
 .modal-header h2 {

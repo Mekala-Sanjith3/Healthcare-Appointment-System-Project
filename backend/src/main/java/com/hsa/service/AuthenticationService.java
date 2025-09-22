@@ -28,15 +28,24 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Email already exists");
         }
         
-        var doctor = new Doctor(
-                request.getName(),
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
-                request.getSpecialization(),
-                request.getQualification(),
-                request.getExperience(),
-                request.getClinicAddress()
-        );
+        // Create Doctor record (standalone entity, not extending User)
+        var doctor = new Doctor();
+        doctor.setId(java.util.UUID.randomUUID().toString());
+        doctor.setName(request.getName());
+        doctor.setEmail(request.getEmail());
+        doctor.setPassword(passwordEncoder.encode(request.getPassword()));
+        doctor.setRole("DOCTOR");
+        doctor.setSpecialization(request.getSpecialization());
+        doctor.setQualification(request.getQualification());
+        doctor.setExperience(request.getExperience());
+        doctor.setClinicAddress(request.getClinicAddress());
+        doctor.setStatus("ACTIVE");
+        doctor.setCreatedAt(java.time.LocalDateTime.now());
+        doctor.setAccountNonExpired(true);
+        doctor.setAccountNonLocked(true);
+        doctor.setCredentialsNonExpired(true);
+        doctor.setEnabled(true);
+        
         doctorRepository.save(doctor);
         var token = jwtService.generateToken(doctor);
         return new LoginResponse(token, doctor.getEmail(), doctor.getRole(), doctor.getId());
@@ -49,16 +58,18 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Email already exists");
         }
         
+        // Create Patient using the constructor that handles inheritance
         var patient = new Patient(
-                request.getName(),
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
-                request.getPhoneNumber(),
-                request.getAddress(),
-                request.getBloodGroup(),
-                request.getAge(),
-                request.getGender()
+            request.getName(),
+            request.getEmail(),
+            passwordEncoder.encode(request.getPassword()),
+            request.getPhoneNumber(),
+            request.getAddress(),
+            request.getBloodGroup(),
+            request.getAge(),
+            request.getGender()
         );
+        
         patientRepository.save(patient);
         var token = jwtService.generateToken(patient);
         return new LoginResponse(token, patient.getEmail(), patient.getRole().name(), patient.getId().toString());
@@ -71,13 +82,15 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Email already exists");
         }
         
+        // Create Admin using the constructor that handles inheritance
         var admin = new Admin(
-                request.getName(),
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
-                request.getDepartment(),
-                request.getContactNumber()
+            request.getName(),
+            request.getEmail(),
+            passwordEncoder.encode(request.getPassword()),
+            request.getDepartment(),
+            request.getContactNumber()
         );
+        
         adminRepository.save(admin);
         var token = jwtService.generateToken(admin);
         return new LoginResponse(token, admin.getEmail(), admin.getRole().name(), admin.getId().toString());
@@ -100,6 +113,12 @@ public class AuthenticationService {
             var doctorOpt = doctorRepository.findByEmail(request.getEmail());
             if (doctorOpt.isPresent()) {
                 var doctor = doctorOpt.get();
+                
+                // Check if doctor is active
+                if (!"ACTIVE".equals(doctor.getStatus())) {
+                    throw new IllegalArgumentException("Your account is currently inactive. Please contact the administrator.");
+                }
+                
                 var token = jwtService.generateToken(doctor);
                 return new LoginResponse(token, doctor.getEmail(), doctor.getRole(), doctor.getId());
             }

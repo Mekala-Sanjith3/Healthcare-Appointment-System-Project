@@ -18,7 +18,13 @@ public class Admin extends User {
     private String contactNumber;
 
     public Admin(String name, String email, String password, String department, String contactNumber) {
-        super(null, name, email, password, Role.ADMIN);
+        super();
+        setName(name);
+        setEmail(email);
+        setPassword(password);
+        setRole(Role.ADMIN);
+        setCreatedAt(java.time.LocalDateTime.now());
+        setUpdatedAt(java.time.LocalDateTime.now());
         this.department = department;
         this.contactNumber = contactNumber;
     }

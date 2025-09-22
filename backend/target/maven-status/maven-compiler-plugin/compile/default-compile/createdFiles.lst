@@ -23,8 +23,10 @@ com\hsa\dto\CreateDoctorRequest.class
 com\hsa\controller\AppointmentController.class
 com\hsa\repository\PatientRepository.class
 com\hsa\dto\AppointmentBookingRequest.class
+com\hsa\controller\TestController.class
 com\hsa\dto\UpdateDoctorStatusRequest.class
 com\hsa\config\ApplicationConfig.class
+com\hsa\controller\TestAuthController.class
 com\hsa\service\SecurityService.class
 com\hsa\controller\AdminController.class
 com\hsa\dto\AvailabilityDTO.class
@@ -46,6 +48,7 @@ com\hsa\repository\UserRepository.class
 com\hsa\config\JwtAuthenticationFilter.class
 com\hsa\service\AdminService.class
 com\hsa\model\User.class
+com\hsa\controller\DebugController.class
 com\hsa\service\AuthenticationService.class
 com\hsa\exception\ResourceNotFoundException.class
 com\hsa\model\Doctor.class

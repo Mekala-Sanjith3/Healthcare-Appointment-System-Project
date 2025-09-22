@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -45,6 +45,9 @@ const FinanceManagement = () => {
     growthRate: '0%'
   });
 
+  const printRef = useRef(null);
+
+
   useEffect(() => {
     fetchFinancialData();
   }, [dateRange]);
@@ -52,99 +55,64 @@ const FinanceManagement = () => {
   const fetchFinancialData = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Get mock payments from localStorage (in a real app, this would be from API)
-      const storedPayments = localStorage.getItem('payments');
-      let paymentsData = [];
-      
-      if (storedPayments) {
-        paymentsData = JSON.parse(storedPayments);
-      } else {
-        paymentsData = generateMockPaymentsData();
-        localStorage.setItem('payments', JSON.stringify(paymentsData));
-      }
-      
+      const { from, to } = computeDateRange(dateRange);
+      const [raw, summaryResp] = await Promise.all([
+        paymentApi.getAll({ from, to }),
+        paymentApi.getSummary({ from, to })
+      ]);
+      const paymentsData = (raw || []).map(p => {
+        const created = p.createdAt || p.created_at || p.date || '';
+        // Normalize various date formats to ISO for reliable parsing
+        const normalizedCreatedAt = typeof created === 'string'
+          ? created.replace(' ', 'T')
+          : created;
+        return { ...p, createdAt: normalizedCreatedAt };
+      });
       setPayments(paymentsData);
-      
-      // Process data for summary stats
-      calculateSummaryStats(paymentsData);
-      
-      // Process data for charts
+      const backendRevenue = Number((summaryResp && (summaryResp.totalRevenue ?? summaryResp.total_revenue)) || 0);
+      calculateSummaryStats(paymentsData, backendRevenue);
       processRevenueChartData(paymentsData);
       processPaymentMethodsData(paymentsData);
-      
-      // Get recent transactions
-      const sortedTransactions = [...paymentsData].sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt)
-      );
+      const sortedTransactions = [...paymentsData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setRecentTransactions(sortedTransactions.slice(0, 5));
-      
-      setIsLoading(false);
     } catch (error) {
       console.error('Error fetching financial data:', error);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const generateMockPaymentsData = () => {
-    const paymentMethods = ['CARD', 'INSURANCE', 'PAYPAL', 'CASH'];
-    const statuses = ['COMPLETED', 'PENDING', 'REFUNDED'];
-    const mockPayments = [];
-    
-    // Generate data for the last 12 months
+  const computeDateRange = (range) => {
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    
-    for (let i = 0; i < 200; i++) {
-      const createdAt = new Date(
-        startDate.getTime() + Math.random() * (now.getTime() - startDate.getTime())
-      );
-      
-      const amount = Math.floor(Math.random() * 500) + 50; // Random amount between $50 and $550
-      const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      
-      mockPayments.push({
-        id: `payment_${i}`,
-        appointmentId: `appointment_${Math.floor(Math.random() * 1000)}`,
-        patientId: `patient_${Math.floor(Math.random() * 100)}`,
-        doctorId: `doctor_${Math.floor(Math.random() * 10)}`,
-        amount,
-        currency: 'USD',
-        status,
-        paymentMethod,
-        transactionId: `txn_${Date.now()}${Math.floor(Math.random() * 10000)}`,
-        createdAt: createdAt.toISOString(),
-        cardDetails: paymentMethod === 'CARD' ? {
-          lastFourDigits: Math.floor(1000 + Math.random() * 9000).toString(),
-          cardType: ['Visa', 'MasterCard', 'Amex'][Math.floor(Math.random() * 3)],
-          expiryMonth: String(Math.floor(Math.random() * 12) + 1).padStart(2, '0'),
-          expiryYear: String(new Date().getFullYear() + Math.floor(Math.random() * 5))
-        } : null,
-        insurance: paymentMethod === 'INSURANCE' ? {
-          provider: ['Blue Cross', 'United Healthcare', 'Aetna', 'Cigna'][Math.floor(Math.random() * 4)],
-          policyNumber: `POL${Math.floor(Math.random() * 10000000)}`,
-          coveragePercentage: [70, 80, 90, 100][Math.floor(Math.random() * 4)]
-        } : null
-      });
+    let start;
+    switch(range) {
+      case 'week':
+        start = new Date(now); start.setDate(now.getDate() - 7); break;
+      case 'month':
+        start = new Date(now); start.setMonth(now.getMonth() - 1); break;
+      case 'quarter':
+        start = new Date(now); start.setMonth(now.getMonth() - 3); break;
+      case 'year':
+        start = new Date(now); start.setFullYear(now.getFullYear() - 1); break;
+      default:
+        start = new Date(now); start.setMonth(now.getMonth() - 1);
     }
-    
-    return mockPayments;
+    const to = now.toISOString().slice(0,19);
+    const from = new Date(start).toISOString().slice(0,19);
+    return { from, to };
   };
 
-  const calculateSummaryStats = (paymentsData) => {
-    // Filter by date range
+  const calculateSummaryStats = (paymentsData, backendRevenue = null) => {
     const filteredPayments = filterPaymentsByDateRange(paymentsData);
     
     // Calculate total revenue (only from completed payments)
-    const completedPayments = filteredPayments.filter(p => p.status === 'COMPLETED');
-    const totalRevenue = completedPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const completedPayments = filteredPayments.filter(p => String(p.status).toUpperCase() === 'COMPLETED');
+    const totalRevenueLocal = completedPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const totalRevenue = backendRevenue != null ? backendRevenue : totalRevenueLocal;
     
     // Calculate outstanding amount (from pending payments)
-    const pendingPayments = filteredPayments.filter(p => p.status === 'PENDING');
-    const outstanding = pendingPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const pendingPayments = filteredPayments.filter(p => String(p.status).toUpperCase() === 'PENDING');
+    const outstanding = pendingPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
     
     // Mock expenses (in a real app, this would come from an expenses API)
     const totalExpenses = totalRevenue * 0.6; // Assume expenses are 60% of revenue
@@ -190,7 +158,12 @@ const FinanceManagement = () => {
         startDate.setMonth(now.getMonth() - 1);
     }
     
-    return paymentsData.filter(payment => new Date(payment.createdAt) >= startDate);
+    return paymentsData.filter(payment => {
+      const raw = payment.createdAt || payment.created_at;
+      if (!raw) return true; // include if missing to avoid dropping rows
+      const d = new Date(typeof raw === 'string' ? raw.replace(' ', 'T') : raw);
+      return !isNaN(d.getTime()) && d >= startDate;
+    });
   };
 
   const processRevenueChartData = (paymentsData) => {
@@ -212,9 +185,9 @@ const FinanceManagement = () => {
           const paymentDate = new Date(payment.createdAt);
           return paymentDate.getMonth() === month.getMonth() && 
                  paymentDate.getFullYear() === month.getFullYear() &&
-                 payment.status === 'COMPLETED';
+                 String(payment.status).toUpperCase() === 'COMPLETED';
         })
-        .reduce((sum, payment) => sum + payment.amount, 0);
+        .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
       
       revenue.push(monthRevenue);
       
@@ -250,12 +223,12 @@ const FinanceManagement = () => {
     const paymentMethods = {};
     
     paymentsData
-      .filter(payment => payment.status === 'COMPLETED')
+      .filter(payment => String(payment.status).toUpperCase() === 'COMPLETED')
       .forEach(payment => {
         if (!paymentMethods[payment.paymentMethod]) {
           paymentMethods[payment.paymentMethod] = 0;
         }
-        paymentMethods[payment.paymentMethod] += payment.amount;
+        paymentMethods[payment.paymentMethod] += Number(payment.amount || 0);
       });
     
     const labels = Object.keys(paymentMethods);
@@ -290,15 +263,40 @@ const FinanceManagement = () => {
 
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    const d = new Date(typeof dateString === 'string' ? dateString.replace(' ', 'T') : dateString);
+    return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleDateString(undefined, options);
   };
 
   const formatCurrency = (amount) => {
     return `$${amount.toLocaleString()}`;
   };
 
+  const exportCsv = () => {
+    const headers = ['Transaction ID','Date','Amount','Payment Method','Status'];
+    const rows = payments.map(t => [
+      t.transactionId || t.transaction_id || '',
+      (t.createdAt || t.created_at || '').toString().replace('T',' '),
+      Number(t.amount || 0),
+      t.paymentMethod || t.payment_method || '',
+      t.status || ''
+    ]);
+    const total = payments.reduce((s,t)=> s + Number(t.amount||0),0);
+    rows.push([]);
+    rows.push(['Total Revenue', '', total, '', '']);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'finance_report.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="finance-management-container">
+    <div className="finance-management-container" ref={printRef}>
       {isLoading ? (
         <div className="loading-spinner-container">
           <div className="loading-spinner"></div>
@@ -321,12 +319,10 @@ const FinanceManagement = () => {
               </select>
             </div>
             <div className="finance-actions">
-              <button className="finance-action-btn">
+              <button className="finance-action-btn" onClick={exportCsv}>
                 <i className="fas fa-download"></i> Export Report
               </button>
-              <button className="finance-action-btn">
-                <i className="fas fa-print"></i> Print
-              </button>
+              {/* Print removed per request */}
             </div>
           </div>
           
@@ -493,17 +489,7 @@ const FinanceManagement = () => {
             </div>
           </div>
           
-          <div className="finance-actions-row">
-            <button className="generate-invoice-btn">
-              <i className="fas fa-file-invoice-dollar"></i> Generate Invoice
-            </button>
-            <button className="run-payroll-btn">
-              <i className="fas fa-money-check-alt"></i> Run Payroll
-            </button>
-            <button className="tax-report-btn">
-              <i className="fas fa-file-alt"></i> Tax Report
-            </button>
-          </div>
+          {/* Removed Generate Invoice, Run Payroll, and Tax Report buttons per request */}
         </>
       )}
     </div>

@@ -147,9 +147,9 @@ router.post('/', auth(['admin', 'patient']), async (req, res) => {
       return res.status(409).json({ message: 'This time slot is already booked' });
     }
     
-    // Get patient and doctor info for notifications
-    const [patientRows] = await db.query('SELECT name FROM patients WHERE id = ?', [patient_id]);
-    const [doctorRows] = await db.query('SELECT name FROM doctors WHERE id = ?', [doctor_id]);
+    // Get patient and doctor info for notifications and appointment data
+    const [patientRows] = await db.query('SELECT name, email FROM patients WHERE id = ?', [patient_id]);
+    const [doctorRows] = await db.query('SELECT name, specialization FROM doctors WHERE id = ?', [doctor_id]);
     
     if (patientRows.length === 0 || doctorRows.length === 0) {
       console.error('Patient or doctor not found:', { patient_id, doctor_id });
@@ -157,22 +157,28 @@ router.post('/', auth(['admin', 'patient']), async (req, res) => {
     }
 
     const patientName = patientRows[0].name;
+    const patientEmail = patientRows[0].email;
     const doctorName = doctorRows[0].name;
+    const doctorSpecialization = doctorRows[0].specialization;
     
     console.log('Creating appointment between patient:', patientName, 'and doctor:', doctorName);
     
     // Start a transaction to ensure data consistency
     await db.query('START TRANSACTION');
     
-    // Insert the appointment
+    // Insert the appointment with all required fields
     const insertQuery = `
-      INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, appointment_type, status, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      INSERT INTO appointments (patient_id, patient_name, patient_email, doctor_id, doctor_name, doctor_specialization, appointment_date, appointment_time, appointment_type, status, notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
     
     const [result] = await db.query(insertQuery, [
       patient_id, 
+      patientName,
+      patientEmail,
       doctor_id, 
+      doctorName,
+      doctorSpecialization,
       date, 
       time, 
       type, 
@@ -302,19 +308,45 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
     // Start a transaction
     await db.query('START TRANSACTION');
     
+    // Get updated patient and doctor info if IDs changed
+    let finalPatientName = appointment.patient_name;
+    let finalPatientEmail = appointment.patient_email;
+    let finalDoctorName = appointment.doctor_name;
+    let finalDoctorSpecialization = appointment.doctor_specialization;
+    
+    if (patient_id && patient_id !== appointment.patient_id) {
+      const [patientRows] = await db.query('SELECT name, email FROM patients WHERE id = ?', [patient_id]);
+      if (patientRows.length > 0) {
+        finalPatientName = patientRows[0].name;
+        finalPatientEmail = patientRows[0].email;
+      }
+    }
+    
+    if (doctor_id && doctor_id !== appointment.doctor_id) {
+      const [doctorRows] = await db.query('SELECT name, specialization FROM doctors WHERE id = ?', [doctor_id]);
+      if (doctorRows.length > 0) {
+        finalDoctorName = doctorRows[0].name;
+        finalDoctorSpecialization = doctorRows[0].specialization;
+      }
+    }
+
     const updateQuery = `
       UPDATE appointments
-      SET patient_id = ?, doctor_id = ?, date = ?, time = ?, 
-          type = ?, status = ?, notes = ?, updated_at = NOW()
+      SET patient_id = ?, patient_name = ?, patient_email = ?, doctor_id = ?, doctor_name = ?, doctor_specialization = ?, 
+          appointment_date = ?, appointment_time = ?, appointment_type = ?, status = ?, notes = ?, updated_at = NOW()
       WHERE id = ?
     `;
     
     await db.query(updateQuery, [
       patient_id || appointment.patient_id,
+      finalPatientName,
+      finalPatientEmail,
       doctor_id || appointment.doctor_id,
-      date || appointment.date,
-      time || appointment.time,
-      type || appointment.type,
+      finalDoctorName,
+      finalDoctorSpecialization,
+      date || appointment.appointment_date,
+      time || appointment.appointment_time,
+      type || appointment.appointment_type,
       status || appointment.status,
       notes || appointment.notes,
       appointmentId
@@ -323,7 +355,7 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
     // Create notifications based on what changed
     if (status && status !== appointment.status) {
       // Status change notification
-      const statusMessage = `Your appointment on ${date || appointment.date} at ${time || appointment.time} has been ${status.toLowerCase()}.`;
+      const statusMessage = `Your appointment on ${date || appointment.appointment_date} at ${time || appointment.appointment_time} has been ${status.toLowerCase()}.`;
       
       // Notify patient about status change
       await db.query(
@@ -339,7 +371,7 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
       
       // If appointment is cancelled or completed, notify doctor as well
       if (status === 'CANCELLED' || status === 'COMPLETED') {
-        const doctorMessage = `The appointment with ${appointment.patient_name} on ${date || appointment.date} at ${time || appointment.time} has been ${status.toLowerCase()}.`;
+        const doctorMessage = `The appointment with ${finalPatientName} on ${date || appointment.appointment_date} at ${time || appointment.appointment_time} has been ${status.toLowerCase()}.`;
         await db.query(
           'INSERT INTO notifications (user_id, title, message, notification_type, reference_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
           [
@@ -350,6 +382,31 @@ router.put('/:id', auth(['admin', 'doctor']), async (req, res) => {
             appointmentId
           ]
         );
+      }
+      
+      // If appointment is completed, create a medical record entry
+      if (status === 'COMPLETED') {
+        try {
+          const medicalRecordQuery = `
+            INSERT INTO medical_records (patient_id, patient_name, doctor_id, doctor_name, diagnosis, prescription, notes, date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), NOW())
+          `;
+          
+          await db.query(medicalRecordQuery, [
+            appointment.patient_id,
+            finalPatientName,
+            appointment.doctor_id,
+            finalDoctorName,
+            'Appointment Completed',
+            'Prescription details to be added by doctor',
+            `Appointment completed on ${date || appointment.appointment_date} at ${time || appointment.appointment_time}. Notes: ${notes || appointment.notes || 'No additional notes.'}`,
+            date || appointment.appointment_date
+          ]);
+          
+          console.log('Medical record created for completed appointment:', appointmentId);
+        } catch (recordError) {
+          console.error('Failed to create medical record for completed appointment:', recordError);
+        }
       }
     } else if ((date && date !== appointment.date) || (time && time !== appointment.time)) {
       // Reschedule notification

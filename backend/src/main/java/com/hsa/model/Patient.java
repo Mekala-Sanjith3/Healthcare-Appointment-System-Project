@@ -34,7 +34,13 @@ public class Patient extends User {
 
     public Patient(String name, String email, String password, String phoneNumber,
                   String address, String bloodGroup, Integer age, String gender) {
-        super(null, name, email, password, Role.PATIENT);
+        super();
+        setName(name);
+        setEmail(email);
+        setPassword(password);
+        setRole(Role.PATIENT);
+        setCreatedAt(java.time.LocalDateTime.now());
+        setUpdatedAt(java.time.LocalDateTime.now());
         this.phoneNumber = phoneNumber;
         this.address = address;
         this.bloodGroup = bloodGroup;

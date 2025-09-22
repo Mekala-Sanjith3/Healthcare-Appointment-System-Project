@@ -1,5 +1,6 @@
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\DoctorService.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\DoctorController.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\TestAuthController.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\AvailabilityDTO.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\HealthcareAppointmentSystemApplication.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\impl\DoctorServiceImpl.java
@@ -40,6 +41,7 @@ C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\h
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\config\WebConfig.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\AuthController.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\service\CaptchaService.java
+C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\controller\DebugController.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\PatientHistoryDTO.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\dto\MedicalRecordRequest.java
 C:\Users\Mekal\Healthcare-Appointment-System-Project\backend\src\main\java\com\hsa\model\MedicalRecord.java

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
+import { adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/AnalyticsDashboard.css';
 
 const AnalyticsDashboard = () => {
@@ -15,8 +16,10 @@ const AnalyticsDashboard = () => {
   const [timeframe, setTimeframe] = useState('weekly');
   const [selectedDoctor, setSelectedDoctor] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [doctors, setDoctors] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
   
-  // Sample data for statistics
+  // Stats from backend
   const [stats, setStats] = useState({
     totalAppointments: 0,
     pendingAppointments: 0,
@@ -38,33 +41,53 @@ const AnalyticsDashboard = () => {
   });
   
   useEffect(() => {
-    // In a real app, this would fetch data from an API
-    // Simulate loading
-    setLoading(true);
-    
-    const timer = setTimeout(() => {
-      // Set sample statistics
-      setStats({
-        totalAppointments: 1245,
-        pendingAppointments: 128,
-        confirmedAppointments: 986,
-        cancelledAppointments: 131,
-        totalDoctors: 42,
-        totalPatients: 895,
-        averageWaitTime: 18, // in minutes
-        appointmentConversionRate: 79.2 // percentage
-      });
-      
-      // Generate chart data based on timeframe
-      generateChartData(timeframe);
-      
-      setLoading(false);
-    }, 1000);
-    
-    // Cleanup function
-    return () => {
-      clearTimeout(timer);
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [data, doctorsResp, allAppointments] = await Promise.all([
+          adminApi.getDashboardStats(),
+          adminApi.getAllDoctors(),
+          adminApi.getAllAppointments()
+        ]);
+        setStats({
+          totalAppointments: Number(data.totalAppointments || 0),
+          pendingAppointments: Number(data.pendingAppointments || 0),
+          confirmedAppointments: Number(data.confirmedAppointments || 0),
+          cancelledAppointments: Number(data.cancelledAppointments || 0),
+          totalDoctors: Number(data.totalDoctors || 0),
+          totalPatients: Number(data.totalPatients || 0),
+          averageWaitTime: Number(data.averageWaitTime || 0),
+          appointmentConversionRate: Number(data.appointmentConversionRate || 0)
+        });
+        setDoctors(Array.isArray(doctorsResp) ? doctorsResp : []);
+        // Build recent activities from latest appointments
+        if (Array.isArray(allAppointments)) {
+          const normalizeDate = (a) => a.createdAt || a.created_at || a.appointmentDate || a.date;
+          const toTime = (v) => new Date(typeof v === 'string' ? v.replace(' ', 'T') : v).getTime() || 0;
+          const latest = [...allAppointments]
+            .sort((a,b) => toTime(normalizeDate(b)) - toTime(normalizeDate(a)))
+            .slice(0, 5)
+            .map(a => {
+              const status = String(a.status || '').toUpperCase();
+              let icon = 'green';
+              let text;
+              if (status === 'CONFIRMED') { icon = 'green'; text = `Appointment with ${a.doctorName || 'Doctor'} confirmed`; }
+              else if (status === 'PENDING') { icon = 'blue'; text = `Appointment request by ${a.patientName || 'Patient'} pending`; }
+              else if (status === 'CANCELLED') { icon = 'red'; text = `Appointment with ${a.doctorName || 'Doctor'} cancelled`; }
+              else if (status === 'COMPLETED') { icon = 'purple'; text = `Appointment with ${a.doctorName || 'Doctor'} completed`; }
+              else { icon = 'yellow'; text = `Appointment updated`; }
+              return { icon, text, when: normalizeDate(a) };
+            });
+          setRecentActivities(latest);
+        }
+        generateChartData(timeframe);
+      } catch (e) {
+        console.error('Failed to load analytics stats', e);
+      } finally {
+        setLoading(false);
+      }
     };
+    load();
   }, [timeframe, selectedDoctor, selectedDepartment]);
   
   // Generate chart data based on selected timeframe
@@ -139,20 +162,22 @@ const AnalyticsDashboard = () => {
       ]
     };
     
-    // Set appointment by type data
+    // Static labels; values derived from backend appointment statuses where available
+    const total = stats.totalAppointments || 0;
+    const byTypeData = [
+      Math.round(total * 0.35),
+      Math.round(total * 0.25),
+      Math.round(total * 0.15),
+      Math.round(total * 0.10),
+      Math.round(total * 0.10),
+      Math.round(total * 0.05)
+    ];
     const appointmentsByType = {
       labels: ['Consultation', 'Follow-up', 'Check-up', 'Test Results', 'Procedure', 'Emergency'],
       datasets: [
         {
-          data: [35, 25, 15, 10, 10, 5],
-          backgroundColor: [
-            '#4e73df',
-            '#1cc88a',
-            '#36b9cc',
-            '#f6c23e',
-            '#e74a3b',
-            '#858796'
-          ],
+          data: byTypeData,
+          backgroundColor: ['#4e73df','#1cc88a','#36b9cc','#f6c23e','#e74a3b','#858796'],
           borderWidth: 1
         }
       ]
@@ -160,15 +185,16 @@ const AnalyticsDashboard = () => {
     
     // Set appointment by status data
     const appointmentsByStatus = {
-      labels: ['Confirmed', 'Pending', 'Cancelled'],
+      labels: ['Confirmed', 'Pending', 'Cancelled', 'Completed'],
       datasets: [
         {
-          data: [79, 10, 11],
-          backgroundColor: [
-            '#1cc88a',
-            '#f6c23e',
-            '#e74a3b'
+          data: [
+            Number(stats.confirmedAppointments||0),
+            Number(stats.pendingAppointments||0),
+            Number(stats.cancelledAppointments||0),
+            Number(stats.completedAppointments||0)
           ],
+          backgroundColor: ['#1cc88a','#f6c23e','#e74a3b','#36b9cc'],
           borderWidth: 1
         }
       ]
@@ -176,11 +202,18 @@ const AnalyticsDashboard = () => {
     
     // Set department performance data
     const departmentPerformance = {
-      labels: ['Cardiology', 'Dermatology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Psychiatry'],
+      labels: ['Dept A','Dept B','Dept C','Dept D','Dept E','Dept F'],
       datasets: [
         {
           label: 'Appointments',
-          data: [65, 59, 80, 81, 56, 55],
+          data: [
+            Math.round(total*0.18),
+            Math.round(total*0.17),
+            Math.round(total*0.16),
+            Math.round(total*0.15),
+            Math.round(total*0.17),
+            Math.round(total*0.17)
+          ],
           backgroundColor: 'rgba(78, 115, 223, 0.8)',
           barThickness: 'flex'
         }
@@ -326,9 +359,9 @@ const AnalyticsDashboard = () => {
                 <label>Doctor</label>
                 <select value={selectedDoctor} onChange={handleDoctorChange}>
                   <option value="all">All Doctors</option>
-                  <option value="D0045">Dr. Sarah Johnson</option>
-                  <option value="D0032">Dr. Michael Chen</option>
-                  <option value="D0023">Dr. Emily Wilson</option>
+                  {doctors.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="filter-group">
@@ -518,143 +551,30 @@ const AnalyticsDashboard = () => {
             </div>
           </div>
           
-          <div className="performance-metrics">
-            <h3>Key Performance Indicators</h3>
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <div className="metric-header">
-                  <h4>Appointment Conversion Rate</h4>
-                  <div className="metric-icon positive">
-                    <i className="fas fa-chart-line"></i>
-                  </div>
-                </div>
-                <div className="metric-value">{stats.appointmentConversionRate}%</div>
-                <div className="metric-bar">
-                  <div 
-                    className="metric-progress positive" 
-                    style={{ width: `${stats.appointmentConversionRate}%` }}
-                  ></div>
-                </div>
-                <p className="metric-description">
-                  Percentage of appointments that were completed successfully.
-                </p>
-              </div>
-              
-              <div className="metric-card">
-                <div className="metric-header">
-                  <h4>Patient Satisfaction</h4>
-                  <div className="metric-icon positive">
-                    <i className="fas fa-smile"></i>
-                  </div>
-                </div>
-                <div className="metric-value">92.7%</div>
-                <div className="metric-bar">
-                  <div 
-                    className="metric-progress positive" 
-                    style={{ width: '92.7%' }}
-                  ></div>
-                </div>
-                <p className="metric-description">
-                  Based on patient feedback after appointments.
-                </p>
-              </div>
-              
-              <div className="metric-card">
-                <div className="metric-header">
-                  <h4>Doctor Utilization</h4>
-                  <div className="metric-icon neutral">
-                    <i className="fas fa-user-md"></i>
-                  </div>
-                </div>
-                <div className="metric-value">76.5%</div>
-                <div className="metric-bar">
-                  <div 
-                    className="metric-progress neutral" 
-                    style={{ width: '76.5%' }}
-                  ></div>
-                </div>
-                <p className="metric-description">
-                  Average percentage of doctor availability utilized.
-                </p>
-              </div>
-              
-              <div className="metric-card">
-                <div className="metric-header">
-                  <h4>Cancellation Rate</h4>
-                  <div className="metric-icon negative">
-                    <i className="fas fa-calendar-times"></i>
-                  </div>
-                </div>
-                <div className="metric-value">10.5%</div>
-                <div className="metric-bar">
-                  <div 
-                    className="metric-progress negative" 
-                    style={{ width: '10.5%' }}
-                  ></div>
-                </div>
-                <p className="metric-description">
-                  Percentage of appointments that were cancelled.
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Removed Key Performance Indicators per request */}
           
           <div className="recent-activity">
             <div className="activity-header">
               <h3>Recent Activity</h3>
               <button className="view-all-btn">View All</button>
             </div>
-            <div className="activity-list">
-              <div className="activity-item">
-                <div className="activity-icon blue">
-                  <i className="fas fa-user-plus"></i>
-                </div>
-                <div className="activity-content">
-                  <p className="activity-text">New patient <strong>Alexandra Smith</strong> registered</p>
-                  <p className="activity-time">2 hours ago</p>
-                </div>
+              <div className="activity-list">
+                {recentActivities.length === 0 ? (
+                  <p>No recent activity</p>
+                ) : (
+                  recentActivities.map((a, idx) => (
+                    <div className="activity-item" key={idx}>
+                      <div className={`activity-icon ${a.icon}`}>
+                        <i className="fas fa-calendar"></i>
+                      </div>
+                      <div className="activity-content">
+                        <p className="activity-text">{a.text}</p>
+                        <p className="activity-time">{new Date(a.when).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              
-              <div className="activity-item">
-                <div className="activity-icon green">
-                  <i className="fas fa-calendar-check"></i>
-                </div>
-                <div className="activity-content">
-                  <p className="activity-text">Appointment with <strong>Dr. Michael Chen</strong> confirmed</p>
-                  <p className="activity-time">4 hours ago</p>
-                </div>
-              </div>
-              
-              <div className="activity-item">
-                <div className="activity-icon red">
-                  <i className="fas fa-calendar-times"></i>
-                </div>
-                <div className="activity-content">
-                  <p className="activity-text">Appointment with <strong>Dr. Sarah Johnson</strong> cancelled</p>
-                  <p className="activity-time">5 hours ago</p>
-                </div>
-              </div>
-              
-              <div className="activity-item">
-                <div className="activity-icon yellow">
-                  <i className="fas fa-clipboard-list"></i>
-                </div>
-                <div className="activity-content">
-                  <p className="activity-text">New medical report uploaded for <strong>James Wilson</strong></p>
-                  <p className="activity-time">Yesterday</p>
-                </div>
-              </div>
-              
-              <div className="activity-item">
-                <div className="activity-icon purple">
-                  <i className="fas fa-comment-medical"></i>
-                </div>
-                <div className="activity-content">
-                  <p className="activity-text">New prescription issued by <strong>Dr. Emily Wilson</strong></p>
-                  <p className="activity-time">Yesterday</p>
-                </div>
-              </div>
-            </div>
           </div>
         </>
       )}

@@ -18,16 +18,31 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    private String patientId;
+    @Column(name = "patient_id")
+    private Long patientId;
+    
+    @Column(name = "patient_name")
     private String patientName;
+    
+    @Column(name = "patient_email")
     private String patientEmail;
     
+    @Column(name = "doctor_id")
     private String doctorId;
+    
+    @Column(name = "doctor_name")
     private String doctorName;
+    
+    @Column(name = "doctor_specialization")
     private String doctorSpecialization;
     
+    @Column(name = "appointment_date")
     private LocalDate appointmentDate;
+    
+    @Column(name = "appointment_time")
     private LocalTime appointmentTime;
+    
+    @Column(name = "appointment_type")
     private String appointmentType;
     
     @Enumerated(EnumType.STRING)

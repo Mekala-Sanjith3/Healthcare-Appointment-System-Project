@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../common/Table/table";
 import { Card, CardHeader, CardTitle, CardContent } from "../../common/Card/card";
@@ -6,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../common/Tabs/tabs
 import "../../../styles/pages/doctor/DoctorDashboard.css";
 import "../../../styles/pages/doctor/PatientHistory.css";
 import { Calendar, Clock, Users, FileText, Bell, Settings, LogOut, Brain, History, Star } from "lucide-react";
-import { doctorApi, appointmentApi } from "../../../services/realtimeApi";
+import { doctorApi, appointmentApi, medicalRecordsApi } from "../../../services/realtimeApi";
 import PatientHistory from "./PatientHistory";
 import DoctorReviews from "./DoctorReviews";
 import AddMedicalRecordModal from './AddMedicalRecordModal';
@@ -36,6 +38,8 @@ const DoctorDashboard = () => {
     type: 'all',
     date: ''
   });
+  const [showReportViewModal, setShowReportViewModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
   
   const [isLoading, setIsLoading] = useState({
     appointments: false,
@@ -69,6 +73,23 @@ const DoctorDashboard = () => {
 
   // Add this state variable
   const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
+
+  // Helper to normalize LocalDate/array to yyyy-MM-dd
+  const normalizeDate = (d) => {
+    if (!d) return '';
+    if (Array.isArray(d)) {
+      const [y, m, day] = d; return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+    return String(d);
+  };
+
+  const normalizeTime = (t) => {
+    if (!t) return '';
+    if (Array.isArray(t)) {
+      const [h, m] = t; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    return String(t);
+  };
   const [selectedAppointmentForDetails, setSelectedAppointmentForDetails] = useState(null);
 
   const navigate = useNavigate();
@@ -129,17 +150,13 @@ const DoctorDashboard = () => {
           doctorAppointments.forEach(appointment => {
             uniqueAppointmentsMap.set(appointment.id, appointment);
           });
+
+  
           
           const uniqueAppointments = Array.from(uniqueAppointmentsMap.values());
           console.log(`Deduplicated ${doctorAppointments.length} appointments to ${uniqueAppointments.length}`);
           
           setAppointments(uniqueAppointments);
-          
-          // Update stats based on real data
-          setStats(prev => ({
-            ...prev,
-            totalAppointments: uniqueAppointments.length
-          }));
           
         } else {
           console.log("No appointments found for doctor ID:", doctor.id);
@@ -166,6 +183,31 @@ const DoctorDashboard = () => {
       fetchAppointments();
     }
   }, [activeTab, doctor.id]);
+
+  // Recompute live dashboard stats from current state
+  useEffect(() => {
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayCount = appointments.filter(a => normalizeDate(a.appointmentDate) === todayStr).length;
+      const uniquePatients = new Set(appointments.map(a => a.patientId || a.patientName).filter(Boolean));
+      const workDayHours = 8;
+      const avgAppointmentHours = 0.5; // 30 minutes each
+      const used = appointments
+        .filter(a => normalizeDate(a.appointmentDate) === todayStr)
+        .length * avgAppointmentHours;
+      const available = Math.max(0, Number((workDayHours - used).toFixed(1)));
+      const pendingReports = (reports || []).filter(r => String(r.status || '').toUpperCase() === 'PENDING').length;
+      setStats(s => ({
+        ...s,
+        totalAppointments: todayCount,
+        totalPatients: uniquePatients.size,
+        availableHours: available,
+        reportsDue: pendingReports
+      }));
+    } catch (e) {
+      // ignore
+    }
+  }, [appointments, reports]);
 
   // Fetch doctor availability
   useEffect(() => {
@@ -238,16 +280,35 @@ const DoctorDashboard = () => {
     }
   }, [activeTab, doctor.id]);
 
-  // Fetch doctor's reports
+  // Fetch doctor's reports (from medical records authored by this doctor)
   useEffect(() => {
     if (!doctor.id) return; // Only fetch if we have doctor ID
     
     const fetchReports = async () => {
       setIsLoading(prev => ({ ...prev, reports: true }));
       try {
-        // Try to fetch the doctor's reports from the API
-        const result = await doctorApi.getDoctorReports(doctor.id);
-        setReports(result);
+        // Build from this doctor's patients and aggregate their records
+        const apps = await appointmentApi.getAppointmentsByDoctorId(doctor.id);
+        const uniquePatientIds = Array.from(new Set((apps || []).map(a => a.patientId).filter(Boolean)));
+        const collected = [];
+        for (const pid of uniquePatientIds) {
+          try {
+            const records = await medicalRecordsApi.getPatientRecords(pid);
+            (records || [])
+              .filter(r => String(r.doctorId) === String(doctor.id))
+              .forEach(r => collected.push(r));
+          } catch (e) { /* ignore individual failures */ }
+        }
+        const mapped = collected.map(r => ({
+          id: r.id,
+          patientId: r.patientId,
+          patientName: r.patientName || String(r.patientId),
+          reportType: 'consultation',
+          reportDate: Array.isArray(r.date) ? `${r.date[0]}-${String(r.date[1]).padStart(2,'0')}-${String(r.date[2]).padStart(2,'0')}` : (r.date || ''),
+          reportContent: r.notes || '',
+          status: 'COMPLETED'
+        })).sort((a,b) => String(b.reportDate||'').localeCompare(String(a.reportDate||'')));
+        setReports(mapped);
       } catch (err) {
         console.error("Failed to fetch reports:", err);
         setError("Failed to load reports. Please refresh the page.");
@@ -336,9 +397,20 @@ const DoctorDashboard = () => {
     navigate('/');
   };
 
-  const handleViewPatientDetails = (appointmentId) => {
-    console.log("Opening patient details for appointment:", appointmentId);
-    setSelectedAppointmentForDetails(appointmentId);
+  const handleViewPatientDetails = (appointmentIdOrPatient) => {
+    // If invoked from patients table, we need to map patient -> latest appointment id
+    let app = null;
+    let id = appointmentIdOrPatient;
+    if (typeof appointmentIdOrPatient !== 'number' && typeof appointmentIdOrPatient !== 'string') {
+      const patientId = appointmentIdOrPatient?.id || appointmentIdOrPatient?.patientId;
+      const latest = appointments
+        .filter(a => String(a.patientId) === String(patientId))
+        .sort((a,b) => String(b.id).localeCompare(String(a.id)))[0];
+      app = latest || null;
+      id = latest?.id;
+    }
+    console.log("Opening patient details for appointment:", id);
+    setSelectedAppointmentForDetails(app || appointments.find(a => String(a.id) === String(id)) || null);
     setShowPatientDetailsModal(true);
   };
 
@@ -348,6 +420,40 @@ const DoctorDashboard = () => {
     // In a real implementation, you would pass the patient ID to the PatientHistory component
     console.log("View patient history for ID:", patientId);
   };
+
+  // Build "My Patients" list from live appointments for this doctor
+  useEffect(() => {
+    try {
+      const unique = new Map();
+      appointments.forEach(a => {
+        const key = String(a.patientId || a.patientName || '');
+        if (!key) return;
+        const last = `${normalizeDate(a.appointmentDate)} ${normalizeTime(a.appointmentTime)}`.trim();
+        if (!unique.has(key)) {
+          unique.set(key, { id: a.patientId || key, name: a.patientName || key, lastVisit: last });
+        } else {
+          // keep the latest by string compare (yyyy-MM-dd HH:mm)
+          const prev = unique.get(key);
+          if (last > (prev.lastVisit || '')) unique.set(key, { ...prev, lastVisit: last });
+        }
+      });
+      setPatients(Array.from(unique.values()).sort((x,y) => x.name.localeCompare(y.name)));
+    } catch (e) {
+      // ignore mapping errors
+    }
+  }, [appointments]);
+
+  // Periodically refresh appointments to keep My Patients real-time
+  useEffect(() => {
+    if (!doctor?.id) return;
+    let timer = setInterval(async () => {
+      try {
+        const fresh = await appointmentApi.getAppointmentsByDoctorId(doctor.id);
+        if (Array.isArray(fresh)) setAppointments(fresh);
+      } catch (e) { /* ignore */ }
+    }, 20000); // 20s
+    return () => clearInterval(timer);
+  }, [doctor?.id]);
 
   // Handle opening the new report form
   const handleOpenReportForm = () => {
@@ -382,6 +488,51 @@ const DoctorDashboard = () => {
     }
   };
 
+  const handleViewReport = (report) => {
+    setSelectedReport(report);
+    setShowReportViewModal(true);
+  };
+
+  const handleDownloadReport = (report) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text('Medical Report', 105, 15, { align: 'center' });
+      doc.setFontSize(11);
+      doc.text('HealthCare Appointment System', 105, 22, { align: 'center' });
+
+      const info = [
+        ['Patient', report.patientName || String(report.patientId)],
+        ['Patient ID', String(report.patientId)],
+        ['Report Type', report.reportType],
+        ['Date', report.reportDate],
+        ['Status', report.status]
+      ];
+      doc.autoTable({
+        startY: 30,
+        head: [['Field','Value']],
+        body: info,
+        theme: 'grid',
+        headStyles: { fillColor: [0,102,204], textColor: 255 },
+        styles: { fontSize: 10 }
+      });
+
+      doc.setFontSize(13);
+      doc.setTextColor(0, 102, 204);
+      doc.text('Report Content', 14, doc.autoTable.previous.finalY + 10);
+      doc.setTextColor(0,0,0);
+      doc.setFontSize(10);
+      const split = doc.splitTextToSize(report.reportContent || 'No content', 180);
+      doc.text(split, 14, doc.autoTable.previous.finalY + 16);
+
+      const fileName = `medical_report_${(report.patientName||'patient').replace(/\s+/g,'_')}_${report.reportDate}.pdf`;
+      doc.save(fileName);
+    } catch (e) {
+      console.error('Failed to download report', e);
+      setError('Failed to download report. Please try again.');
+    }
+  };
+
   // Handle report form submission
   const handleSubmitReport = async (e) => {
     e.preventDefault();
@@ -389,50 +540,42 @@ const DoctorDashboard = () => {
     try {
       // Determine if this is a new report or an update
       if (reportFormData.id) {
-        // Update existing report
-        const result = await doctorApi.updateMedicalReport(reportFormData.id, reportFormData);
-        
-        // Update local state
-        setReports(prev => 
-          prev.map(report => 
-            report.id === reportFormData.id ? result : report
-          )
-        );
-      } else {
-        // Create new report
-        const newReport = {
-          ...reportFormData,
-          doctorId: doctor.id,
-          doctorName: doctor.name,
-          specialty: doctor.specialization
-        };
-        
-        // Submit to API
-        const result = await doctorApi.createMedicalReport(newReport);
-        
-        // Update local state
-        setReports(prev => [...prev, result]);
-        
-        // Create a medical record entry for the patient to see in their dashboard
-        const medicalRecordData = {
-          patient_id: reportFormData.patientId,
-          doctor_id: doctor.id,
-          doctor_name: doctor.name,
-          specialty: doctor.specialization,
+        // Update existing as medical record (use backend request DTO keys)
+        const updatePayload = {
           diagnosis: `${reportFormData.reportType.charAt(0).toUpperCase() + reportFormData.reportType.slice(1)} Report`,
-          description: reportFormData.reportContent,
           prescription: "",
-          treatment_plan: "",
-          notes: `Report generated on ${reportFormData.reportDate}`,
-          date: reportFormData.reportDate
+          notes: reportFormData.reportContent,
+          recordDate: reportFormData.reportDate
         };
-        
-        try {
-          await medicalRecordsApi.addMedicalRecord(medicalRecordData);
-          console.log("Medical record created for patient:", reportFormData.patientId);
-        } catch (recordError) {
-          console.error("Failed to create medical record:", recordError);
-        }
+        await medicalRecordsApi.updateMedicalRecord(reportFormData.id, updatePayload);
+        setReports(prev => prev.map(r => r.id === reportFormData.id ? {
+          ...r,
+          reportType: reportFormData.reportType,
+          reportDate: reportFormData.reportDate,
+          reportContent: reportFormData.reportContent,
+          status: r.status || 'COMPLETED'
+        } : r));
+      } else {
+        // Create a medical record entry which serves as the persisted report
+        const medicalRecordData = {
+          patientId: String(reportFormData.patientId),
+          doctorId: Number(doctor.id),
+          diagnosis: `${reportFormData.reportType.charAt(0).toUpperCase() + reportFormData.reportType.slice(1)} Report`,
+          prescription: "",
+          notes: reportFormData.reportContent,
+          recordDate: reportFormData.reportDate
+        };
+        const created = await medicalRecordsApi.addMedicalRecord(medicalRecordData);
+        const uiReport = {
+          id: created?.id,
+          patientId: reportFormData.patientId,
+          patientName: reportFormData.patientName,
+          reportType: reportFormData.reportType,
+          reportDate: reportFormData.reportDate,
+          reportContent: reportFormData.reportContent,
+          status: 'COMPLETED'
+        };
+        setReports(prev => [...prev, uiReport]);
       }
       
       // Close modal
@@ -580,7 +723,28 @@ const DoctorDashboard = () => {
             <Card>
               <CardHeader className="flex justify-between">
                 <CardTitle>Today's Appointments</CardTitle>
-                <button className="export-btn">
+                <button className="export-btn" onClick={() => {
+                  try {
+                    const rows = todayAppointments.concat(appointments).map(a => ({
+                      date: Array.isArray(a.appointmentDate) ? `${a.appointmentDate[0]}-${String(a.appointmentDate[1]).padStart(2,'0')}-${String(a.appointmentDate[2]).padStart(2,'0')}` : a.appointmentDate,
+                      time: Array.isArray(a.appointmentTime) ? `${String(a.appointmentTime[0]).padStart(2,'0')}:${String(a.appointmentTime[1]).padStart(2,'0')}` : (a.appointmentTime || ''),
+                      patient: a.patientName || '',
+                      type: a.appointmentType || '',
+                      status: a.status || ''
+                    }));
+                    const headers = ['Date','Time','Patient','Type','Status'];
+                    const csv = [headers.join(','), ...rows.map(r => [r.date, r.time, r.patient, r.type, r.status].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'doctor_schedule.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  } catch (e) { console.error('Export failed', e); }
+                }}>
                   <i className="fas fa-download"></i> Export Schedule
                 </button>
               </CardHeader>
@@ -827,10 +991,6 @@ const DoctorDashboard = () => {
           <div className="content-card">
             <div className="card-header">
               <h2>Manage Availability</h2>
-              <button className="ai-suggest-btn">
-                <Brain className="nav-icon" />
-                AI Suggestions
-              </button>
             </div>
             
             {isLoading.availability ? (
@@ -887,23 +1047,10 @@ const DoctorDashboard = () => {
               </div>
             </div>
 
-            <div className="card-header">
-              <h2>Patients Who Booked Appointments</h2>
-              <div className="search-filters">
-                <input 
-                  type="text" 
-                  placeholder="Search patients by name..." 
-                  className="search-input"
-                  value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-
             <div className="patients-grid">
               {isLoading.patients ? (
                 <div className="loading-spinner">Loading patients...</div>
-              ) : ( 
+              ) : (
                 <div className="patients-list">
                   <table>
                     <thead>
@@ -931,7 +1078,7 @@ const DoctorDashboard = () => {
                           </td>
                           <td>
                             <div className="action-buttons">
-                              <button className="view-btn" onClick={() => handleViewPatientDetails(patient.id)}>
+                              <button className="view-btn" onClick={() => handleViewPatientDetails(patient)}>
                                 View
                               </button>
                               <button className="history-btn" onClick={() => handleViewPatientHistory(patient.id)}>
@@ -1102,8 +1249,8 @@ const DoctorDashboard = () => {
                               <div className="action-buttons">
                                 {report.status === 'COMPLETED' ? (
                                   <>
-                                    <button className="view-btn">View</button>
-                                    <button className="download-btn">Download</button>
+                                    <button className="view-btn" onClick={() => handleViewReport(report)}>View</button>
+                                    <button className="download-btn" onClick={() => handleDownloadReport(report)}>Download</button>
                                   </>
                                 ) : (
                                   <>
@@ -1306,10 +1453,6 @@ const DoctorDashboard = () => {
         </nav>
         
         <div className="sidebar-footer">
-          <button className="nav-item">
-            <Settings className="nav-icon" />
-            <span>Settings</span>
-          </button>
           <button className="nav-item logout" onClick={handleLogout}>
             <LogOut className="nav-icon" />
             <span>Logout</span>
@@ -1391,6 +1534,28 @@ const DoctorDashboard = () => {
 
         {renderContent()}
       </main>
+
+      {showReportViewModal && selectedReport && (
+        <div className="appointment-details-modal">
+          <div className="modal-content">
+            <span className="close-btn" onClick={() => setShowReportViewModal(false)}>&times;</span>
+            <h2>Report Details</h2>
+            <p><strong>Patient:</strong> {selectedReport.patientName} ({selectedReport.patientId})</p>
+            <p><strong>Type:</strong> {selectedReport.reportType}</p>
+            <p><strong>Date:</strong> {selectedReport.reportDate}</p>
+            <p><strong>Status:</strong> {selectedReport.status}</p>
+            <div style={{marginTop: '12px'}}>
+              <strong>Content</strong>
+              <div style={{marginTop: '6px', background:'#f8f9fa', padding:'10px', borderRadius:'6px'}}>
+                {selectedReport.reportContent || 'No content'}
+              </div>
+            </div>
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button className="download-btn" onClick={() => handleDownloadReport(selectedReport)}>Download PDF</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAppointmentDetailsModal && (
         <div className="appointment-details-modal">

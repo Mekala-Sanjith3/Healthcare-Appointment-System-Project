@@ -4,7 +4,7 @@ import "../../../styles/pages/patient/PatientDashboard.css";
 import "../../../styles/pages/patient/MedicalRecords.css"; // Import the new CSS file
 import BookAppointmentModal from './BookAppointmentModal';
 import DoctorSearch from './DoctorSearch';
-import { patientApi, appointmentApi, medicalRecordsApi } from '../../../services/realtimeApi';
+import { patientApi, appointmentApi, medicalRecordsApi, reviewsApi } from '../../../services/realtimeApi';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
@@ -56,6 +56,7 @@ const PatientDashboard = () => {
   const [documents, setDocuments] = useState([]);
   const [showAddMedicationModal, setShowAddMedicationModal] = useState(false);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
+  const [showAddHealthReading, setShowAddHealthReading] = useState(false);
   const [medicationFormData, setMedicationFormData] = useState({
     name: '',
     dosage: '',
@@ -77,6 +78,7 @@ const PatientDashboard = () => {
     date: '',
     file: null
   });
+  const [newReading, setNewReading] = useState({ systolic: '', diastolic: '', glucose: '', weight: '' });
   
   // Quick actions state
   const [showQuickActions, setShowQuickActions] = useState(true);
@@ -450,12 +452,14 @@ const PatientDashboard = () => {
     if (appointment) {
       setSelectedAppointment(appointment);
       setShowAppointmentDetailsModal(true);
+      try { document.body.classList.add('modal-open'); } catch {}
     }
   };
 
   const closeAppointmentDetailsModal = () => {
     setShowAppointmentDetailsModal(false);
     setSelectedAppointment(null);
+    try { document.body.classList.remove('modal-open'); } catch {}
   };
 
   const renderAppointmentRow = (appointment) => (
@@ -1414,7 +1418,7 @@ const PatientDashboard = () => {
               <div className="card">
                 <div className="card-header">
                   <h2>Health Analytics</h2>
-                  <button className="add-health-data-btn">
+                  <button className="add-health-data-btn" onClick={() => setShowAddHealthReading(true)}>
                     <i className="fas fa-plus"></i> Add New Reading
                   </button>
                 </div>
@@ -2462,6 +2466,59 @@ const PatientDashboard = () => {
               >
                 Save Medication
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Health Reading Modal */}
+      {showAddHealthReading && (
+        <div className="modal-overlay">
+          <div className="modal add-health-reading-modal">
+            <div className="modal-header">
+              <h3>Add New Reading</h3>
+              <button className="close-modal" onClick={() => setShowAddHealthReading(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-content">
+              <form className="health-reading-form" onSubmit={(e) => {
+                e.preventDefault();
+                // Append reading locally
+                const now = new Date().toISOString();
+                setHealthAnalytics(prev => ({
+                  ...prev,
+                  bloodPressure: [...prev.bloodPressure, { systolic: Number(newReading.systolic||120), diastolic: Number(newReading.diastolic||80), date: now }],
+                  glucose: [...prev.glucose, { value: Number(newReading.glucose||95), date: now }],
+                  weight: [...prev.weight, { value: Number(newReading.weight||70), date: now }]
+                }));
+                setShowAddHealthReading(false);
+              }}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="reading-systolic">Systolic (mmHg)</label>
+                    <input id="reading-systolic" type="number" min="50" max="250" onChange={(e)=>setNewReading(r=>({...r,systolic:e.target.value}))} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="reading-diastolic">Diastolic (mmHg)</label>
+                    <input id="reading-diastolic" type="number" min="30" max="150" onChange={(e)=>setNewReading(r=>({...r,diastolic:e.target.value}))} />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="reading-glucose">Glucose (mg/dL)</label>
+                    <input id="reading-glucose" type="number" min="40" max="500" onChange={(e)=>setNewReading(r=>({...r,glucose:e.target.value}))} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="reading-weight">Weight (kg)</label>
+                    <input id="reading-weight" type="number" step="0.1" min="1" max="500" onChange={(e)=>setNewReading(r=>({...r,weight:e.target.value}))} />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="cancel-btn" onClick={()=>setShowAddHealthReading(false)}>Cancel</button>
+                  <button type="submit" className="submit-btn">Save Reading</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

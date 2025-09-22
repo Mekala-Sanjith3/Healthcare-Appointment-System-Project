@@ -110,41 +110,16 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
   return (
     <div 
       className="doctor-profile-modal"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        zIndex: 10000,
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose(false);
         }
       }}
     >
-      <div 
-        className="modal-content"
-        style={{
-          maxWidth: '90vw',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          margin: 'auto',
-          position: 'relative'
-        }}
-      >
+      <div className="modal-content">
         <div className="modal-header">
-          <h2>{isEditing ? 'Edit Doctor Profile' : 'Doctor Profile'}</h2>
-          <button className="close-button" onClick={() => onClose(false)}>
+          <h2>{isEditing ? 'Edit Doctor Profile' : 'Doctor Details'}</h2>
+          <button className="close-icon" onClick={() => onClose(false)}>
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -160,8 +135,9 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
             <span>{error}</span>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="profile-header">
+          <div className="modal-body">
+            <form onSubmit={handleSubmit}>
+              <div className="profile-header">
               <div className="profile-picture-section">
                 {doctor?.profilePicture ? (
                   <img 
@@ -194,120 +170,164 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
               </div>
             </div>
 
-            <div className="form-grid">
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-user"></i>
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
+            <div className="doctor-details">
+              <div className="detail-section">
+                <h3>Personal Information</h3>
+                <div className="detail-item">
+                  <label>Name:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.name || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Email:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.email || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>ID:</label>
+                  <div className="detail-value">{doctor?.id || 'N/A'}</div>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-envelope"></i>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
+              <div className="detail-section">
+                <h3>Professional Information</h3>
+                <div className="detail-item">
+                  <label>Specialization:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="specialization"
+                        value={formData.specialization}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.specialization || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Qualification:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="qualification"
+                        value={formData.qualification}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.qualification || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Experience:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="experience"
+                        value={formData.experience}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.experience || 'N/A'
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-stethoscope"></i>
-                  Specialization
-                </label>
-                <input
-                  type="text"
-                  name="specialization"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-graduation-cap"></i>
-                  Qualification
-                </label>
-                <input
-                  type="text"
-                  name="qualification"
-                  value={formData.qualification}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-briefcase"></i>
-                  Experience
-                </label>
-                <input
-                  type="text"
-                  name="experience"
-                  value={formData.experience}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-hospital"></i>
-                  Clinic Address
-                </label>
-                <input
-                  type="text"
-                  name="clinicAddress"
-                  value={formData.clinicAddress}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-dollar-sign"></i>
-                  Consultation Fee
-                </label>
-                <input
-                  type="number"
-                  name="consultationFee"
-                  value={formData.consultationFee}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <i className="fas fa-calendar"></i>
-                  Availability Schedule
-                </label>
-                <input
-                  type="text"
-                  name="availabilitySchedule"
-                  value={formData.availabilitySchedule}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  placeholder="e.g., Mon-Fri 9AM-5PM"
-                />
+              <div className="detail-section">
+                <h3>Practice Information</h3>
+                <div className="detail-item">
+                  <label>Clinic Address:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="clinicAddress"
+                        value={formData.clinicAddress}
+                        onChange={handleChange}
+                      />
+                    ) : (
+                      formData.clinicAddress || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Consultation Fee:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        name="consultationFee"
+                        value={formData.consultationFee}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.01"
+                      />
+                    ) : (
+                      formData.consultationFee ? `$${formData.consultationFee}` : 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Availability:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="availabilitySchedule"
+                        value={formData.availabilitySchedule}
+                        onChange={handleChange}
+                        placeholder="e.g., Mon-Fri 9AM-5PM"
+                      />
+                    ) : (
+                      formData.availabilitySchedule || 'N/A'
+                    )}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label>Status:</label>
+                  <div className="detail-value">
+                    {isEditing ? (
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                      >
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                        <option value="PENDING">Pending</option>
+                      </select>
+                    ) : (
+                      <span className={`status-badge ${formData.status?.toLowerCase() || 'active'}`}>
+                        {formData.status || 'ACTIVE'}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -375,7 +395,8 @@ const DoctorProfileModal = ({ isOpen, onClose, doctorId, mode = 'view' }) => {
                 </button>
               )}
             </div>
-          </form>
+            </form>
+          </div>
         )}
       </div>
     </div>

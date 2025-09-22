@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../../../styles/pages/admin/StaffManagement.css';
+import { staffApi } from '../../../services/realtimeApi';
+import AddStaffModal from './AddStaffModal';
 
 const StaffManagement = ({ searchTerm, filters }) => {
   const [staffMembers, setStaffMembers] = useState([]);
@@ -9,98 +11,28 @@ const StaffManagement = ({ searchTerm, filters }) => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
-    // Fetch staff members data (mock data for now)
     const fetchStaffMembers = async () => {
       setIsLoading(true);
       try {
-        // In a real app, this would be an API call
-        setTimeout(() => {
-          setStaffMembers(getMockStaffData());
-          setIsLoading(false);
-        }, 800);
+        const data = await staffApi.getAll();
+        setStaffMembers(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching staff members:", error);
+      } finally {
         setIsLoading(false);
       }
     };
-
     fetchStaffMembers();
   }, []);
-
-  // Mock staff data generator
-  const getMockStaffData = () => {
-    return [
-      {
-        id: "staff_001",
-        name: "Sarah Johnson",
-        role: "Nurse",
-        department: "Emergency",
-        email: "sarah.johnson@healthcare.com",
-        phone: "555-123-4567",
-        hireDate: "2020-03-15",
-        status: "Active",
-        education: "BSN, University of Michigan",
-        certifications: ["RN", "ACLS", "PALS"]
-      },
-      {
-        id: "staff_002",
-        name: "Robert Davis",
-        role: "Lab Technician",
-        department: "Laboratory",
-        email: "robert.davis@healthcare.com",
-        phone: "555-987-6543",
-        hireDate: "2019-06-28",
-        status: "Active",
-        education: "BS in Medical Technology, Ohio State University",
-        certifications: ["MLT", "Blood Bank Technology"]
-      },
-      {
-        id: "staff_003",
-        name: "Emily Martinez",
-        role: "Receptionist",
-        department: "Administration",
-        email: "emily.martinez@healthcare.com",
-        phone: "555-456-7890",
-        hireDate: "2021-01-10",
-        status: "Active",
-        education: "Associates Degree in Healthcare Administration",
-        certifications: ["Medical Office Assistant"]
-      },
-      {
-        id: "staff_004",
-        name: "Michael Wong",
-        role: "Pharmacist",
-        department: "Pharmacy",
-        email: "michael.wong@healthcare.com",
-        phone: "555-789-0123",
-        hireDate: "2018-09-05",
-        status: "Active",
-        education: "PharmD, University of California",
-        certifications: ["RPh", "Immunization Certification"]
-      },
-      {
-        id: "staff_005",
-        name: "Jennifer Smith",
-        role: "Nurse",
-        department: "Outpatient",
-        email: "jennifer.smith@healthcare.com",
-        phone: "555-234-5678",
-        hireDate: "2020-07-22",
-        status: "On Leave",
-        education: "BSN, University of Washington",
-        certifications: ["RN", "Wound Care Certification"]
-      }
-    ];
-  };
 
   // Filter staff based on search term and filters
   const filteredStaff = staffMembers.filter(staff => {
     const matchesSearch = !searchTerm || 
-      staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.phone.includes(searchTerm) ||
-      staff.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.role.toLowerCase().includes(searchTerm.toLowerCase());
+      (staff.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((staff.email || '')).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((staff.phone || '')).includes(searchTerm) ||
+      ((staff.department || '')).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((staff.role || '')).toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = !filters.role || staff.role === filters.role;
     const matchesDepartment = !filters.department || staff.department === filters.department;
@@ -120,8 +52,9 @@ const StaffManagement = ({ searchTerm, filters }) => {
 
   const handleDeleteStaff = (staffId) => {
     if (window.confirm("Are you sure you want to delete this staff member?")) {
-      // In a real app, this would be an API call
-      setStaffMembers(staffMembers.filter(s => s.id !== staffId));
+      staffApi.delete(staffId)
+        .then(() => setStaffMembers(staffMembers.filter(s => s.id !== staffId)))
+        .catch(err => console.error('Failed to delete staff', err));
     }
   };
 
@@ -165,7 +98,6 @@ const StaffManagement = ({ searchTerm, filters }) => {
                   <th>Name</th>
                   <th>Role</th>
                   <th>Department</th>
-                  <th>Email</th>
                   <th>Phone</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -179,13 +111,10 @@ const StaffManagement = ({ searchTerm, filters }) => {
                     </td>
                     <td>{staff.role}</td>
                     <td>{staff.department}</td>
-                    <td>
-                      <a href={`mailto:${staff.email}`}>{staff.email}</a>
-                    </td>
                     <td>{staff.phone}</td>
                     <td>
-                      <span className={`status-badge ${getStatusBadgeClass(staff.status)}`}>
-                        {staff.status}
+                      <span className={`status-badge ${getStatusBadgeClass(staff.status || '')}`}>
+                        {(staff.status || '').toString().toUpperCase()}
                       </span>
                     </td>
                     <td className="actions-cell">
@@ -288,19 +217,19 @@ const StaffManagement = ({ searchTerm, filters }) => {
               </div>
               <div className="detail-item">
                 <label>Hire Date:</label>
-                <span>{selectedStaff.hireDate}</span>
+                <span>{selectedStaff.hireDate || '—'}</span>
               </div>
               <div className="detail-item">
                 <label>Status:</label>
-                <span>{selectedStaff.status}</span>
+                <span>{selectedStaff.status || '—'}</span>
               </div>
               <div className="detail-item">
                 <label>Education:</label>
-                <span>{selectedStaff.education}</span>
+                <span>{selectedStaff.education || '—'}</span>
               </div>
               <div className="detail-item">
                 <label>Certifications:</label>
-                <span>{selectedStaff.certifications.join(", ")}</span>
+                <span>{Array.isArray(selectedStaff.certifications) ? selectedStaff.certifications.join(", ") : '—'}</span>
               </div>
             </div>
             <div className="modal-actions">
@@ -312,6 +241,26 @@ const StaffManagement = ({ searchTerm, filters }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add/Edit Staff Modal */}
+      {showAddStaffModal && (
+        <AddStaffModal
+          isOpen={showAddStaffModal}
+          onClose={() => setShowAddStaffModal(false)}
+          onAdd={async () => {
+            try {
+              const data = await staffApi.getAll();
+              setStaffMembers(Array.isArray(data) ? data : []);
+            } catch (e) {
+              console.error('Failed to refresh staff after save', e);
+            } finally {
+              setShowAddStaffModal(false);
+              setSelectedStaff(null);
+            }
+          }}
+          staff={selectedStaff}
+        />
       )}
     </div>
   );

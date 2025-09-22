@@ -141,38 +141,13 @@ const PatientProfileModal = ({ isOpen, onClose, patientId, onUpdate }) => {
   return (
     <div 
       className="modal-overlay"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        zIndex: 10000,
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div 
-        className="modal-container patient-profile-modal"
-        style={{
-          maxWidth: '90vw',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          margin: 'auto',
-          position: 'relative'
-        }}
-      >
+      <div className="modal-container patient-profile-modal">
         <div className="modal-header">
           <h2>{isEditing ? 'Edit Patient Profile' : 'Patient Profile'}</h2>
           <button className="close-icon" onClick={onClose}>

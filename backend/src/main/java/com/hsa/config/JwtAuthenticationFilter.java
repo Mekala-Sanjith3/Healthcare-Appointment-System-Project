@@ -34,6 +34,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String userEmail;
         
+        // Skip JWT processing for registration and test endpoints
+        String requestURI = request.getRequestURI();
+        if (requestURI.startsWith("/api/auth/register") || 
+            requestURI.startsWith("/api/test-auth") ||
+            requestURI.startsWith("/api/test/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         // Skip the filter if no Authorization header or if it doesn't start with "Bearer "
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);

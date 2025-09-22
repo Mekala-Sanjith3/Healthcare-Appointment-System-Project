@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/admin/AppointmentsList.css';
@@ -22,7 +22,7 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
     notes: ''
   });
   
-  const appointmentsPrintRef = useRef();
+  const appointmentsPrintRef = useRef(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,12 +33,68 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [selectedPatient, setSelectedPatient] = useState('');
 
-  // Fetch appointments from API
-  useEffect(() => {
-    const fetchAppointments = async () => {
+  // Normalize various time formats (e.g., "150", "15:00", "03:00 PM", {hour, minute}) to HH:mm for <input type="time">
+  const normalizeTimeToHHMM = (value) => {
+    if (!value && value !== 0) return '';
+    // Object form { hour, minute }
+    if (typeof value === 'object') {
+      const hour = value.hour ?? value.Hours ?? value.hours;
+      const minute = value.minute ?? value.Minutes ?? value.minutes ?? 0;
+      if (hour == null) return '';
+      return `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+    }
+    // Numeric like 150 or 930
+    if (typeof value === 'number') {
+      const s = String(value).padStart(4,'0');
+      return `${s.slice(0,2)}:${s.slice(2,4)}`;
+    }
+    // String variants
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      // Already HH:mm
+      const hhmm = trimmed.match(/^\d{1,2}:\d{2}$/);
+      if (hhmm) {
+        const [h, m] = trimmed.split(':');
+        return `${String(h).padStart(2,'0')}:${m}`;
+      }
+      // With AM/PM
+      const ampmMatch = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (ampmMatch) {
+        let h = parseInt(ampmMatch[1], 10);
+        const m = ampmMatch[2];
+        const mer = ampmMatch[3].toUpperCase();
+        if (mer === 'PM' && h < 12) h += 12;
+        if (mer === 'AM' && h === 12) h = 0;
+        return `${String(h).padStart(2,'0')}:${m}`;
+      }
+      // Plain number string like "150" → "01:50"
+      const digits = trimmed.replace(/\D/g, '');
+      if (digits.length === 3 || digits.length === 4) {
+        const s = digits.padStart(4,'0');
+        return `${s.slice(0,2)}:${s.slice(2,4)}`;
+      }
+    }
+    return '';
+  };
+
+  // Fetch appointments from API (hoisted so other effects can reuse)
+  const fetchAppointments = useCallback(async (serverFilters = false) => {
       try {
         setLoading(true);
-        const data = await adminApi.getAllAppointments();
+        const apiParams = {};
+        if (serverFilters) {
+          // Push UI selections to backend for authoritative filtering
+          if (filters?.status && !['all','all status'].includes(String(filters.status).trim().toLowerCase())) {
+            apiParams.status = String(filters.status).toUpperCase();
+          }
+          if (filters?.date && /\d/.test(String(filters.date))) {
+            apiParams.date = String(filters.date);
+          }
+          if (searchTerm && searchTerm.trim()) {
+            apiParams.search = searchTerm.trim();
+          }
+        }
+        const data = await adminApi.getAllAppointments(apiParams);
         setAppointments(data);
         setFilteredAppointments(data);
         
@@ -54,14 +110,52 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
       } finally {
         setLoading(false);
       }
-    };
+  }, [filters, searchTerm]);
 
-    fetchAppointments();
+  useEffect(() => {
+    // First load without filters; later filter effect may trigger server filters
+    fetchAppointments(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
 
   // Filter appointments based on search term, filters, selected doctor and patient
   useEffect(() => {
     let result = [...appointments];
+    
+    const normalizeDateForCompare = (value) => {
+      if (!value) return '';
+      if (value instanceof Date) {
+        const y = value.getFullYear();
+        const m = String(value.getMonth() + 1).padStart(2, '0');
+        const d = String(value.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      const s = String(value).trim();
+      // yyyy-MM-dd
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      // dd-MM-yyyy
+      const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+      if (dmy) {
+        const [, d, mo, y] = dmy;
+        return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      // yyyy/MM/dd or dd/MM/yyyy
+      const parts = s.split(/[\/.]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+        }
+        if (parts[2].length === 4) {
+          return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+      }
+      // yyyymmdd numeric
+      const digits = s.replace(/\D/g, '');
+      if (digits.length === 8) {
+        return `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}`;
+      }
+      return s;
+    };
     
     // Filter by search term (case insensitive)
     if (searchTerm) {
@@ -85,18 +179,36 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
       result = result.filter(appointment => appointment.patientName === selectedPatient);
     }
     
-    // Filter by status
-    if (filters.status && filters.status !== 'all') {
-      result = result.filter(appointment => appointment.status === filters.status);
+    // Filter by status (case-insensitive), ignore placeholders like 'All Status'
+    if (filters.status) {
+      const statusVal = String(filters.status).trim().toLowerCase();
+      if (statusVal !== 'all' && statusVal !== 'all status') {
+        const wanted = statusVal.toUpperCase();
+        result = result.filter(appointment => String(appointment.status ?? '').trim().toUpperCase() === wanted);
+      }
     }
     
     // Filter by date
     if (filters.date) {
-      result = result.filter(appointment => appointment.appointmentDate === filters.date);
+      const raw = String(filters.date).trim();
+      // Ignore placeholders like 'dd-mm-yyyy'
+      const isPlaceholder = /^d{2}-m{2}-y{4}$/i.test(raw) || raw.toLowerCase() === 'dd-mm-yyyy';
+      if (!isPlaceholder && /\d/.test(raw)) {
+        const target = normalizeDateForCompare(raw);
+        result = result.filter(appointment => normalizeDateForCompare(appointment.appointmentDate) === target);
+      }
     }
     
     setFilteredAppointments(result);
-  }, [appointments, searchTerm, filters, selectedDoctor, selectedPatient]);
+    // Also fetch from server when filters are meaningful to ensure DB authoritative results
+    const statusVal = String(filters.status || '').trim().toLowerCase();
+    const hasStatus = statusVal && !['all','all status'].includes(statusVal);
+    const hasDate = filters.date && /\d/.test(String(filters.date));
+    const hasSearch = searchTerm && searchTerm.trim();
+    if (hasStatus || hasDate || hasSearch) {
+      fetchAppointments(true);
+    }
+  }, [appointments, searchTerm, filters, selectedDoctor, selectedPatient, fetchAppointments]);
 
   // Handle doctor selection change
   const handleDoctorChange = (e) => {
@@ -160,9 +272,34 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   // Save edited appointment
   const handleSaveEdit = async () => {
     try {
+      // Normalize date/time for backend (LocalDate, LocalTime)
+      const normalizeDate = (value) => {
+        if (!value) return '';
+        if (value instanceof Date) {
+          const y = value.getFullYear();
+          const m = String(value.getMonth() + 1).padStart(2, '0');
+          const d = String(value.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        const s = String(value);
+        // Accept dd-mm-yyyy or yyyy/mm/dd etc., coerce to yyyy-MM-dd
+        const match = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+        if (match) {
+          const [, y, mo, da] = match;
+          return `${y}-${mo.padStart(2,'0')}-${da.padStart(2,'0')}`;
+        }
+        // If already yyyy-MM-dd just return
+        return s;
+      };
+
+      const hhmm = normalizeTimeToHHMM(editFormData.appointmentTime);
+      const normalizedTime = hhmm ? `${hhmm}:00` : '';
+
       const updatedAppointment = {
         ...selectedAppointment,
-        ...editFormData
+        ...editFormData,
+        appointmentDate: normalizeDate(editFormData.appointmentDate),
+        appointmentTime: normalizedTime
       };
       
       // Update appointment via API
@@ -224,6 +361,8 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
   // Setup print functionality
   const handlePrint = useReactToPrint({
     content: () => appointmentsPrintRef.current,
+    // Pass contentRef to satisfy newer react-to-print versions
+    contentRef: appointmentsPrintRef,
     documentTitle: `Healthcare_Appointments_List${selectedDoctor ? `_Doctor_${selectedDoctor.replace(/\s+/g, '_')}` : ''}${selectedPatient ? `_Patient_${selectedPatient.replace(/\s+/g, '_')}` : ''}`,
     pageStyle: `
       @page {
@@ -850,7 +989,7 @@ const AppointmentsList = ({ searchTerm, filters, refreshTrigger }) => {
                     <input 
                       type="time" 
                       name="appointmentTime" 
-                      value={editFormData.appointmentTime.replace(' AM', '').replace(' PM', '')} 
+                    value={normalizeTimeToHHMM(editFormData.appointmentTime)} 
                       onChange={(e) => {
                         const timeValue = e.target.value;
                         const hour = parseInt(timeValue.split(':')[0]);

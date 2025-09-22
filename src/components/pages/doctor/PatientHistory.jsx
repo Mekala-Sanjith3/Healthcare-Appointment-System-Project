@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doctorApi } from '../../../services/realtimeApi';
+import { medicalRecordsApi, appointmentApi } from '../../../services/realtimeApi';
 import PatientSearch from './PatientSearch';
 
 const PatientHistory = () => {
@@ -27,18 +27,41 @@ const PatientHistory = () => {
   useEffect(() => {
     if (!selectedPatient) return;
     
+    const normalizeDate = (d) => {
+      if (!d) return '';
+      if (Array.isArray(d)) {
+        const [y,m,day] = d; return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      }
+      return String(d);
+    };
+    const normalizeTime = (t) => {
+      if (!t) return '';
+      if (Array.isArray(t)) {
+        const [h,m] = t; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      }
+      return String(t);
+    };
+    
     const fetchPatientData = async () => {
       setIsLoading(true);
       setError(null);
       
       try {
-        // Fetch medical records
-        const history = await doctorApi.getPatientMedicalHistory(selectedPatient.id);
-        setMedicalHistory(history);
+        // Fetch medical records created by doctors for this patient
+        const records = await medicalRecordsApi.getPatientMedicalHistory(selectedPatient.id);
+        setMedicalHistory(Array.isArray(records) ? records : (records?.data || []));
         
-        // Fetch appointment history
-        const appointments = await doctorApi.getPatientAppointments(selectedPatient.id);
-        setAppointmentHistory(appointments);
+        // Fetch appointment history for this patient
+        const apps = await appointmentApi.getAppointmentsByPatientId(selectedPatient.id);
+        const mapped = (apps || []).map(a => ({
+          id: a.id,
+          date: normalizeDate(a.appointmentDate),
+          time: normalizeTime(a.appointmentTime),
+          type: a.appointmentType || a.type || '',
+          status: a.status || '',
+          doctorName: a.doctorName || ''
+        }));
+        setAppointmentHistory(mapped);
       } catch (err) {
         console.error('Failed to fetch patient data:', err);
         setError('Failed to load patient information. Please try again.');
@@ -48,6 +71,10 @@ const PatientHistory = () => {
     };
 
     fetchPatientData();
+
+    // Light polling to keep history fresh during the visit
+    const interval = setInterval(fetchPatientData, 20000);
+    return () => clearInterval(interval);
   }, [selectedPatient]);
 
   const handleSelectPatient = (patient) => {

@@ -33,7 +33,7 @@ public class PatientServiceImpl implements PatientService {
 
     @Override
     public List<Appointment> getPatientAppointments(String patientId, String statusStr) {
-        List<Appointment> appointments = appointmentRepository.findByPatientId(patientId);
+        List<Appointment> appointments = appointmentRepository.findByPatientId(Long.parseLong(patientId));
         
         // Filter by status if provided
         if (statusStr != null && !statusStr.isEmpty()) {
@@ -55,7 +55,7 @@ public class PatientServiceImpl implements PatientService {
         }
         
         // Set appointment details
-        appointment.setPatientId(patientId);
+        appointment.setPatientId(Long.parseLong(patientId));
         // We would normally fetch the patient name and email from the repository
         // For now, hardcode or mock this data
         appointment.setPatientName("Patient Name"); // In a real implementation, fetch from repository

@@ -3,9 +3,13 @@ package com.hsa.controller;
 import com.hsa.model.Appointment;
 import com.hsa.model.Doctor;
 import com.hsa.model.Patient;
+import com.hsa.model.MedicalRecord;
 import com.hsa.repository.AppointmentRepository;
 import com.hsa.repository.DoctorRepository;
 import com.hsa.repository.PatientRepository;
+import com.hsa.repository.MedicalRecordRepository;
+import com.hsa.repository.PaymentRepository;
+import com.hsa.model.Payment;
 import com.hsa.dto.AppointmentBookingRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.LocalDateTime;
+// removed unused imports
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +30,8 @@ public class AppointmentController {
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
     private final PatientRepository patientRepository;
+    private final MedicalRecordRepository medicalRecordRepository;
+    private final PaymentRepository paymentRepository;
 
     @PostMapping("/book")
     @PreAuthorize("hasRole('PATIENT')")
@@ -46,7 +51,7 @@ public class AppointmentController {
 
             // Create new appointment
             Appointment appointment = new Appointment();
-            appointment.setPatientId(request.getPatientId());
+            appointment.setPatientId(Long.parseLong(request.getPatientId()));
             appointment.setDoctorId(request.getDoctorId());
             appointment.setAppointmentDate(request.getAppointmentDate());
             appointment.setAppointmentTime(request.getAppointmentTime());
@@ -56,6 +61,23 @@ public class AppointmentController {
             appointment.setCreatedAt(LocalDate.now());
 
             Appointment savedAppointment = appointmentRepository.save(appointment);
+
+            // Record an immediate $150 booking transaction
+            try {
+                Payment payment = new Payment();
+                payment.setAppointmentId(savedAppointment.getId());
+                payment.setPatientId(savedAppointment.getPatientId());
+                payment.setDoctorId(savedAppointment.getDoctorId());
+                payment.setAmount(150.0);
+                payment.setCurrency("USD");
+                payment.setPaymentMethod("CASH");
+                payment.setStatus("COMPLETED");
+                payment.setTransactionId("BOOK-" + savedAppointment.getId());
+                paymentRepository.save(payment);
+            } catch (Exception payErr) {
+                System.err.println("Failed to create booking payment record: " + payErr.getMessage());
+            }
+
             return ResponseEntity.ok(savedAppointment);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -66,7 +88,29 @@ public class AppointmentController {
     @PreAuthorize("hasRole('PATIENT') or hasRole('ADMIN') or hasRole('DOCTOR')")
     public ResponseEntity<List<Appointment>> getPatientAppointments(@PathVariable String patientId) {
         try {
-            List<Appointment> appointments = appointmentRepository.findByPatientId(patientId);
+            List<Appointment> appointments = appointmentRepository.findByPatientId(Long.parseLong(patientId));
+            
+            // Populate patient and doctor names
+            for (Appointment appointment : appointments) {
+                // Get patient details
+                if (appointment.getPatientId() != null) {
+                    Optional<Patient> patient = patientRepository.findById(appointment.getPatientId());
+                    if (patient.isPresent()) {
+                        appointment.setPatientName(patient.get().getName());
+                        appointment.setPatientEmail(patient.get().getEmail());
+                    }
+                }
+                
+                // Get doctor details
+                if (appointment.getDoctorId() != null) {
+                    Optional<Doctor> doctor = doctorRepository.findById(appointment.getDoctorId());
+                    if (doctor.isPresent()) {
+                        appointment.setDoctorName(doctor.get().getName());
+                        appointment.setDoctorSpecialization(doctor.get().getSpecialization());
+                    }
+                }
+            }
+            
             return ResponseEntity.ok(appointments);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -78,6 +122,28 @@ public class AppointmentController {
     public ResponseEntity<List<Appointment>> getDoctorAppointments(@PathVariable String doctorId) {
         try {
             List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+            
+            // Populate patient and doctor names
+            for (Appointment appointment : appointments) {
+                // Get patient details
+                if (appointment.getPatientId() != null) {
+                    Optional<Patient> patient = patientRepository.findById(appointment.getPatientId());
+                    if (patient.isPresent()) {
+                        appointment.setPatientName(patient.get().getName());
+                        appointment.setPatientEmail(patient.get().getEmail());
+                    }
+                }
+                
+                // Get doctor details
+                if (appointment.getDoctorId() != null) {
+                    Optional<Doctor> doctor = doctorRepository.findById(appointment.getDoctorId());
+                    if (doctor.isPresent()) {
+                        appointment.setDoctorName(doctor.get().getName());
+                        appointment.setDoctorSpecialization(doctor.get().getSpecialization());
+                    }
+                }
+            }
+            
             return ResponseEntity.ok(appointments);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -98,7 +164,63 @@ public class AppointmentController {
             Appointment appointment = appointmentOpt.get();
             appointment.setStatus(status);
 
+            // Populate names before saving
+            if (appointment.getPatientId() != null) {
+                Optional<Patient> patient = patientRepository.findById(appointment.getPatientId());
+                if (patient.isPresent()) {
+                    appointment.setPatientName(patient.get().getName());
+                    appointment.setPatientEmail(patient.get().getEmail());
+                }
+            }
+            
+            if (appointment.getDoctorId() != null) {
+                Optional<Doctor> doctor = doctorRepository.findById(appointment.getDoctorId());
+                if (doctor.isPresent()) {
+                    appointment.setDoctorName(doctor.get().getName());
+                    appointment.setDoctorSpecialization(doctor.get().getSpecialization());
+                }
+            }
             Appointment updatedAppointment = appointmentRepository.save(appointment);
+
+            // If appointment is completed, create a medical record and payment
+            if (status == Appointment.AppointmentStatus.COMPLETED) {
+                try {
+                    MedicalRecord medicalRecord = new MedicalRecord();
+                    medicalRecord.setPatientId(appointment.getPatientId());
+                    medicalRecord.setPatientName(appointment.getPatientName());
+                    medicalRecord.setDoctorId(appointment.getDoctorId());
+                    medicalRecord.setDoctorName(appointment.getDoctorName());
+                    medicalRecord.setDiagnosis("Appointment Completed");
+                    medicalRecord.setPrescription("Prescription details to be added by doctor");
+                    medicalRecord.setNotes("Appointment completed on " + appointment.getAppointmentDate() + 
+                                        " at " + appointment.getAppointmentTime() + 
+                                        ". Notes: " + (appointment.getNotes() != null ? appointment.getNotes() : "No additional notes."));
+                    medicalRecord.setDate(appointment.getAppointmentDate());
+                    medicalRecord.setCreatedAt(LocalDate.now());
+                    medicalRecord.setUpdatedAt(LocalDate.now());
+                    
+                    medicalRecordRepository.save(medicalRecord);
+                } catch (Exception recordError) {
+                    // Log error but don't fail the appointment update
+                    System.err.println("Failed to create medical record for completed appointment: " + recordError.getMessage());
+                }
+
+                try {
+                    Payment payment = new Payment();
+                    payment.setAppointmentId(appointment.getId());
+                    payment.setPatientId(appointment.getPatientId());
+                    payment.setDoctorId(appointment.getDoctorId());
+                    payment.setAmount(150.0);
+                    payment.setCurrency("USD");
+                    payment.setPaymentMethod("CASH");
+                    payment.setStatus("COMPLETED");
+                    payment.setTransactionId("APPT-" + appointment.getId());
+                    paymentRepository.save(payment);
+                } catch (Exception payErr) {
+                    System.err.println("Failed to create payment record: " + payErr.getMessage());
+                }
+            }
+
             return ResponseEntity.ok(updatedAppointment);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -135,8 +257,8 @@ public class AppointmentController {
             List<Appointment> existingAppointments = appointmentRepository
                 .findByDoctorIdAndAppointmentDate(doctorId, appointmentDate);
             
-            // Generate available time slots (this is simplified - in real app would be more complex)
-            List<String> availableSlots = generateAvailableTimeSlots(existingAppointments);
+            // Generate available time slots using doctor's saved availability
+            List<String> availableSlots = generateAvailableTimeSlots(doctorId, appointmentDate, existingAppointments);
             
             return ResponseEntity.ok(availableSlots);
         } catch (Exception e) {
@@ -144,12 +266,31 @@ public class AppointmentController {
         }
     }
 
-    private List<String> generateAvailableTimeSlots(List<Appointment> existingAppointments) {
-        // Simplified time slot generation
+    private List<String> generateAvailableTimeSlots(String doctorId, LocalDate date, List<Appointment> existingAppointments) {
+        // Default window in case availability not set
         List<String> allSlots = List.of(
             "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
             "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
         );
+        try {
+            Doctor d = doctorRepository.findById(doctorId).orElse(null);
+            if (d != null && d.getAvailabilitySchedule() != null && !d.getAvailabilitySchedule().isBlank()) {
+                // Expecting a simple stringified JSON like {"monday":{"isAvailable":true,"start":"09:00","end":"17:00"},...}
+                String json = d.getAvailabilitySchedule();
+                String dayKey = date.getDayOfWeek().name().toLowerCase();
+                if (json.contains(dayKey)) {
+                    // very lightweight parse without JSON lib
+                    boolean isAvailable = json.contains("\"" + dayKey + "\":") && json.contains("isAvailable\":true");
+                    String start = extract(json, dayKey, "start", "09:00");
+                    String end = extract(json, dayKey, "end", "17:00");
+                    if (isAvailable) {
+                        allSlots = buildSlots(start, end, 30);
+                    } else {
+                        allSlots = List.of();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
         
         List<String> bookedSlots = existingAppointments.stream()
             .map(app -> app.getAppointmentTime().toString().substring(0, 5))
@@ -158,5 +299,32 @@ public class AppointmentController {
         return allSlots.stream()
             .filter(slot -> !bookedSlots.contains(slot))
             .toList();
+    }
+
+    private List<String> buildSlots(String start, String end, int minutes) {
+        java.util.ArrayList<String> slots = new java.util.ArrayList<>();
+        java.time.LocalTime s = java.time.LocalTime.parse(start);
+        java.time.LocalTime e = java.time.LocalTime.parse(end);
+        while (!s.isAfter(e)) {
+            slots.add(s.toString().substring(0,5));
+            s = s.plusMinutes(minutes);
+        }
+        return slots;
+    }
+
+    private String extract(String json, String dayKey, String field, String fallback) {
+        try {
+            int dayIdx = json.indexOf("\"" + dayKey + "\"");
+            if (dayIdx < 0) return fallback;
+            int startObj = json.indexOf('{', dayIdx);
+            int endObj = json.indexOf('}', startObj);
+            String obj = json.substring(startObj, endObj);
+            int fIdx = obj.indexOf("\"" + field + "\"");
+            if (fIdx < 0) return fallback;
+            int colon = obj.indexOf(':', fIdx);
+            int quote1 = obj.indexOf('"', colon + 1);
+            int quote2 = obj.indexOf('"', quote1 + 1);
+            return obj.substring(quote1 + 1, quote2);
+        } catch (Exception e) { return fallback; }
     }
 }

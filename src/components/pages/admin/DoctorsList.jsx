@@ -10,10 +10,19 @@ const DoctorsList = ({ searchTerm, filters }) => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [modalMode, setModalMode] = useState('view');
+  const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     fetchDoctors();
   }, []);
+
+  // Show notification and auto-hide after 3 seconds
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 3000);
+  };
 
   const fetchDoctors = async () => {
     try {
@@ -31,12 +40,38 @@ const DoctorsList = ({ searchTerm, filters }) => {
 
   const handleStatusChange = async (doctorId, newStatus) => {
     try {
-      await adminApi.updateDoctorStatus(doctorId, newStatus);
-      // Refresh the doctors list
-      fetchDoctors();
+      setLoading(true);
+      const response = await adminApi.updateDoctorStatus(doctorId, newStatus);
+      console.log("Status update response:", response);
+      
+      // Find the doctor name for notification
+      const doctor = doctors.find(d => d.id === doctorId);
+      const doctorName = doctor ? doctor.name : 'Doctor';
+      
+      // Update the local state immediately for real-time feedback
+      setDoctors(prevDoctors => 
+        prevDoctors.map(doctor => 
+          doctor.id === doctorId 
+            ? { ...doctor, status: newStatus, updatedAt: new Date().toISOString() }
+            : doctor
+        )
+      );
+      
+      // Show success notification
+      showNotification(`${doctorName}'s status updated to ${newStatus}`, 'success');
+      
+      // Refresh the doctors list to ensure data consistency
+      await fetchDoctors();
     } catch (err) {
       console.error("Error updating doctor status:", err);
-      setError(err.message || 'Failed to update doctor status');
+      const errorMessage = err.message || 'Failed to update doctor status';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
+      
+      // Revert the local state change on error
+      await fetchDoctors();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,6 +145,14 @@ const DoctorsList = ({ searchTerm, filters }) => {
 
   return (
     <>
+      {/* Notification Display */}
+      {notification && (
+        <div className={`notification ${notification.type}`}>
+          <i className={`fas ${notification.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+          <span>{notification.message}</span>
+        </div>
+      )}
+      
       <div className="doctors-table">
         {filteredDoctors.length === 0 ? (
           <div className="empty-state">

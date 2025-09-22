@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { patientApi } from '../../../services/realtimeApi';
+import { patientApi, adminApi } from '../../../services/realtimeApi';
 import '../../../styles/pages/doctor/PatientDetailsModal.css';
 
 const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {
@@ -18,74 +18,111 @@ const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {
         
         console.log("Fetching appointment with ID:", appointmentId);
         
-        // Try to get appointment from API
-        let appointmentData;
-        try {
-          appointmentData = await appointmentApi.getAppointmentById(appointmentId);
-        } catch (apiError) {
-          console.error("API request failed:", apiError);
-          
-          // Fallback: check in localStorage for the appointment data
-          const allAppointments = JSON.parse(localStorage.getItem('mockAppointments') || '[]');
-          appointmentData = allAppointments.find(app => app.id === appointmentId);
-          
-          if (!appointmentData) {
-            throw new Error("Appointment data not found");
-          }
-          console.log("Found appointment in localStorage:", appointmentData);
-        }
-        
-        setAppointment(appointmentData);
-        
-        // Check if the appointment has patient details
-        if (appointmentData.patientDetails) {
-          console.log("Using patient details from appointment");
-          setPatientDetails(appointmentData.patientDetails);
-        } else {
-          // If no details in appointment, try to fetch from patient profile
+        // Get appointment by ID or accept a full appointment object
+        let appointmentData = (typeof appointmentId === 'object' && appointmentId !== null) ? appointmentId : undefined;
+        if (!appointmentData) {
           try {
-            console.log("Fetching patient data for ID:", appointmentData.patientId);
-            const patientData = await patientApi.getPatientById(appointmentData.patientId);
-            console.log("Patient data fetched:", patientData);
-            
-            setPatientDetails({
-              age: patientData.age || '35',
-              gender: patientData.gender || 'Male',
-              bloodGroup: patientData.bloodGroup || 'O+',
-              // Include additional fields from patient record if available
-              allergyHistory: patientData.allergyHistory || 'None reported',
-              currentMedications: patientData.currentMedications || 'None reported',
-              pastMedicalHistory: patientData.pastMedicalHistory || 'None reported',
-              vitalSigns: {
-                height: patientData.height || '175',
-                weight: patientData.weight || '70',
-                temperature: patientData.temperature || '98.6°F',
-                bloodPressure: patientData.bloodPressure || '120/80',
-                pulse: patientData.pulse || '72',
-                oxygenSaturation: patientData.oxygenSaturation || '98%'
-              }
-            });
-          } catch (patientError) {
-            console.error('Failed to fetch patient data:', patientError);
-            
-            // Use default values if patient fetching fails
-            setPatientDetails({
-              age: '40',
-              gender: 'Not specified',
-              bloodGroup: 'Not specified',
-              allergyHistory: 'Not available',
-              currentMedications: 'Not available',
-              pastMedicalHistory: 'Not available',
-              vitalSigns: {
-                height: '',
-                weight: '',
-                temperature: '',
-                bloodPressure: '',
-                pulse: '',
-                oxygenSaturation: ''
-              }
-            });
+            // Try doctor-scoped appointments first to avoid admin auth
+            const user = JSON.parse(localStorage.getItem('userData') || '{}');
+            let all = [];
+            if (user?.id) {
+              try {
+                const docApps = await (await import('../../../services/realtimeApi')).appointmentApi.getAppointmentsByDoctorId(user.id);
+                if (Array.isArray(docApps)) all = docApps;
+              } catch {}
+            }
+            if (!all || all.length === 0) {
+              // Fallback to admin endpoint (requires ADMIN token)
+              all = await adminApi.getAllAppointments();
+            }
+            appointmentData = (all || []).find(app => String(app.id) === String(appointmentId));
+          } catch (apiError) {
+            console.error('API request failed:', apiError);
           }
+        }
+        if (!appointmentData) {
+          throw new Error('Appointment data not found');
+        }
+        // Normalize possible LocalDate/LocalTime array values
+        const normalizeDate = (d) => {
+          if (!d) return '';
+          if (Array.isArray(d)) {
+            const [y,m,day] = d; return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          }
+          return String(d);
+        };
+        const normalizeTime = (t) => {
+          if (!t) return '';
+          if (Array.isArray(t)) {
+            const [h,m] = t; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+          }
+          return String(t);
+        };
+
+        const normalizedAppointment = {
+          ...appointmentData,
+          appointmentDate: normalizeDate(appointmentData.appointmentDate),
+          appointmentTime: normalizeTime(appointmentData.appointmentTime),
+        };
+        console.log("Found appointment (normalized):", normalizedAppointment);
+        
+        setAppointment(normalizedAppointment);
+        
+        // Always fetch patient profile to enrich/merge missing fields for real-time details
+        try {
+          console.log("Fetching patient data for ID:", appointmentData.patientId);
+          const patientData = await patientApi.getPatientProfile(appointmentData.patientId);
+          console.log("Patient data fetched:", patientData);
+
+          const mergedVitalSigns = {
+            height: appointmentData.patientDetails?.vitalSigns?.height || patientData?.height || '',
+            weight: appointmentData.patientDetails?.vitalSigns?.weight || patientData?.weight || '',
+            temperature: appointmentData.patientDetails?.vitalSigns?.temperature || patientData?.temperature || '',
+            bloodPressure: appointmentData.patientDetails?.vitalSigns?.bloodPressure || patientData?.bloodPressure || '',
+            pulse: appointmentData.patientDetails?.vitalSigns?.pulse || patientData?.pulse || '',
+            oxygenSaturation: appointmentData.patientDetails?.vitalSigns?.oxygenSaturation || patientData?.oxygenSaturation || ''
+          };
+
+          const mergedDetails = {
+            // Prefer explicit appointment-embedded details, then patient profile, then sensible defaults
+            name: appointmentData.patientDetails?.name || patientData?.name || '',
+            age: appointmentData.patientDetails?.age || patientData?.age || '',
+            gender: appointmentData.patientDetails?.gender || patientData?.gender || '',
+            bloodGroup: appointmentData.patientDetails?.bloodGroup || patientData?.bloodGroup || '',
+            allergyHistory: appointmentData.patientDetails?.allergyHistory || patientData?.allergyHistory || 'None reported',
+            currentMedications: appointmentData.patientDetails?.currentMedications || patientData?.currentMedications || 'None reported',
+            pastMedicalHistory: appointmentData.patientDetails?.pastMedicalHistory || patientData?.pastMedicalHistory || 'None reported',
+            vitalSigns: mergedVitalSigns
+          };
+
+          setPatientDetails(mergedDetails);
+
+          // Ensure name/email on appointment for header/exports
+          setAppointment(prev => ({
+            ...prev,
+            patientName: prev?.patientName || mergedDetails?.name || patientData?.name || prev?.patientId || '',
+            patientEmail: prev?.patientEmail || patientData?.email || prev?.patientEmail
+          }));
+        } catch (patientError) {
+          console.error('Failed to fetch patient data:', patientError);
+          // If fetching profile fails, still show whatever details embedded in the appointment
+          const fallback = appointmentData.patientDetails || {};
+          setPatientDetails({
+            age: fallback.age || '',
+            gender: fallback.gender || '',
+            bloodGroup: fallback.bloodGroup || '',
+            allergyHistory: fallback.allergyHistory || 'None reported',
+            currentMedications: fallback.currentMedications || 'None reported',
+            pastMedicalHistory: fallback.pastMedicalHistory || 'None reported',
+            vitalSigns: {
+              height: fallback.vitalSigns?.height || '',
+              weight: fallback.vitalSigns?.weight || '',
+              temperature: fallback.vitalSigns?.temperature || '',
+              bloodPressure: fallback.vitalSigns?.bloodPressure || '',
+              pulse: fallback.vitalSigns?.pulse || '',
+              oxygenSaturation: fallback.vitalSigns?.oxygenSaturation || ''
+            }
+          });
         }
       } catch (err) {
         console.error('Error fetching appointment details:', err);
@@ -279,17 +316,21 @@ const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Type:</span>
-                    <span className="detail-value">{appointment?.appointmentType}</span>
+                    <span className="detail-value">{appointment?.appointmentType || 'N/A'}</span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Status:</span>
                     <span className={`detail-value status-badge ${appointment?.status?.toLowerCase()}`}>
-                      {appointment?.status}
+                      {appointment?.status || 'N/A'}
                     </span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Chief Complaint:</span>
                     <span className="detail-value">{appointment?.problem || 'None specified'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Doctor:</span>
+                    <span className="detail-value">{appointment?.doctorName || 'N/A'}{appointment?.doctorSpecialization ? ` (${appointment.doctorSpecialization})` : ''}</span>
                   </div>
                 </div>
               </section>
@@ -299,7 +340,7 @@ const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {
                 <div className="detail-grid">
                   <div className="detail-item">
                     <span className="detail-label">Name:</span>
-                    <span className="detail-value">{appointment?.patientName}</span>
+                    <span className="detail-value">{appointment?.patientName || patientDetails?.name || 'N/A'}</span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Age:</span>
@@ -312,6 +353,14 @@ const PatientDetailsModal = ({ isOpen, onClose, appointmentId }) => {
                   <div className="detail-item">
                     <span className="detail-label">Blood Group:</span>
                     <span className="detail-value">{patientDetails?.bloodGroup || 'N/A'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Patient ID:</span>
+                    <span className="detail-value">{appointment?.patientId || 'N/A'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Email:</span>
+                    <span className="detail-value">{patientDetails?.email || appointment?.patientEmail || 'N/A'}</span>
                   </div>
                 </div>
               </section>

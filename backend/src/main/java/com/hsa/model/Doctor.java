@@ -42,6 +42,9 @@ public class Doctor implements UserDetails {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    
     // Fields required by Spring Security
     private String role = "DOCTOR";
     private boolean accountNonExpired = true;
@@ -60,6 +63,7 @@ public class Doctor implements UserDetails {
         this.experience = experience;
         this.clinicAddress = clinicAddress;
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
     
     public Doctor(String id, String name, String email, String password, String specialization, 

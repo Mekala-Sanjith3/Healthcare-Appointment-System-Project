@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doctorApi } from '../../../services/realtimeApi';
+import { doctorApi, appointmentApi, patientApi } from '../../../services/realtimeApi';
 
 const PatientSearch = ({ onSelectPatient, doctorId }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,10 +15,30 @@ const PatientSearch = ({ onSelectPatient, doctorId }) => {
       
       setIsLoading(true);
       try {
-        // In a real implementation, this would come from a doctorApi.getRecentPatients() call
-        // For now, we'll use the search function with empty query to get all patients
-        const patients = await doctorApi.searchPatients(doctorId, '');
-        setRecentPatients(patients.slice(0, 5)); // Just show the first 5 patients
+        // For now, use the search function with empty query to get all patients
+        let patients = await doctorApi.searchPatients('');
+        if (!Array.isArray(patients) || patients.length === 0) {
+          // Fallback: build from doctor's live appointments
+          const apps = await appointmentApi.getAppointmentsByDoctorId(doctorId);
+          const unique = new Map();
+          for (const a of apps || []) {
+            const key = String(a.patientId || a.patientName || '');
+            if (!key) continue;
+            if (!unique.has(key)) {
+              unique.set(key, { id: a.patientId || key, name: a.patientName || `Patient ${key}`, gender: a.gender || 'N/A', age: a.age || '' });
+            }
+          }
+          patients = Array.from(unique.values());
+          // Try to enrich with profile data
+          const enriched = await Promise.all(patients.map(async p => {
+            try {
+              const prof = await patientApi.getPatientProfile(p.id);
+              return { ...p, ...prof };
+            } catch { return p; }
+          }));
+          patients = enriched;
+        }
+        setRecentPatients((patients || []).slice(0, 5));
       } catch (err) {
         console.error('Failed to fetch recent patients:', err);
         setError('Failed to load patient list. Please try again.');
@@ -42,7 +62,7 @@ const PatientSearch = ({ onSelectPatient, doctorId }) => {
     const searchTimeout = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const results = await doctorApi.searchPatients(doctorId, searchQuery.trim());
+        const results = await doctorApi.searchPatients(searchQuery.trim());
         setSearchResults(results);
       } catch (err) {
         console.error('Failed to search patients:', err);

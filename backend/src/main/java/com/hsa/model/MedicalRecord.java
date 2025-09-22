@@ -17,10 +17,16 @@ public class MedicalRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    private String patientId;
+    @Column(name = "patient_id")
+    private Long patientId;
+    
+    @Column(name = "patient_name")
     private String patientName;
     
+    @Column(name = "doctor_id")
     private String doctorId;
+    
+    @Column(name = "doctor_name")
     private String doctorName;
     
     private String diagnosis;

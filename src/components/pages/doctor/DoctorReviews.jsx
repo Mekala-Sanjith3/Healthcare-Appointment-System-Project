@@ -28,6 +28,8 @@ const DoctorReviews = ({ doctorId }) => {
 
     if (doctorId) {
       fetchDoctorReviews();
+      const interval = setInterval(fetchDoctorReviews, 20000);
+      return () => clearInterval(interval);
     }
   }, [doctorId]);
 
