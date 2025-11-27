@@ -45,9 +45,7 @@ services:
       - backend
 
   frontend:
-    build:
-      context: .
-    container_name: frontend
+    image: healthcare-appointment-system-project-frontend
     ports:
       - "80:80"
     depends_on:
