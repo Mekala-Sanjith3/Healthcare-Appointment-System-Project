@@ -155,4 +155,4 @@ docker compose down -v
 Environment:
 - Backend reads DB via `SPRING_DATASOURCE_*` (set in docker-compose.yml)
 - API Gateway proxies `/api/*` to `http://backend:8082`
-- Frontend Nginx proxies `/api/*` to API Gateway
+- Frontend Nginx proxies `/api/*` to API Gateway"# HealthCare_CI_CD" 
